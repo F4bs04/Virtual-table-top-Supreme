@@ -416,72 +416,123 @@
                 </select>
               </div>
 
-              <!-- Background Map Upload Selector -->
-              <div class="control-row">
-                <span class="control-label">Background Map:</span>
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                  <label class="file-upload-btn" style="margin: 0; padding: 0.5rem 1rem; font-size: 0.8rem;">
-                    Upload Map
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      onchange={handleBackgroundUpload} 
-                      style="display: none;"
-                    />
-                  </label>
-                  {#if networkState.gameState.backgroundImage}
-                    <button 
-                      onclick={() => networkState.updateBackgroundImage('')} 
-                      class="delete-piece-btn" 
-                      style="margin: 0; padding: 0.5rem; line-height: 1;"
-                      title="Remove Background Image"
-                    >
-                      ✕
-                    </button>
-                  {/if}
-                </div>
-              </div>
-              {#if networkState.gameState.backgroundImage}
-                <div class="control-row" style="flex-direction: column; align-items: stretch; gap: 0.25rem;">
-                  <div style="display: flex; justify-content: space-between; font-size: 0.78rem; color: #94a3b8;">
-                    <span>Map Opacity:</span>
-                    <span style="font-family: monospace;">{Math.round((networkState.gameState.backgroundImageOpacity ?? 1.0) * 100)}%</span>
-                  </div>
-                  <input 
-                    type="range" 
-                    min="0.1" 
-                    max="1.0" 
-                    step="0.05"
-                    value={networkState.gameState.backgroundImageOpacity ?? 1.0}
-                    oninput={(e) => networkState.updateBackgroundImageOpacity(Number(e.target.value))}
-                    style="width: 100%; cursor: pointer; accent-color: #a855f7;"
-                  />
-                </div>
-              {/if}
+              <!-- ── Ambientes & Cenários ─────────────────────────── -->
+              <div class="glass-card" style="margin-top: 1rem; padding: 1rem; border: 1px solid rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.02); border-radius: 8px;">
+                <h4 style="margin: 0 0 0.75rem 0; color: #a855f7; font-size: 0.9rem; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.35rem;">
+                  🗺️ Cenários / Ambientes
+                </h4>
 
-              <!-- Ambient Theme Selector -->
-              <div class="control-row">
-                <span class="control-label">Ambience:</span>
-                <div class="theme-buttons">
-                  <button 
-                    onclick={() => networkState.updateTheme('soul-society')} 
-                    class="theme-btn {networkState.gameState.theme === 'soul-society' ? 'active soul-society' : ''}"
+                <!-- Select Active Environment -->
+                <div class="control-row">
+                  <span class="control-label">Ativo:</span>
+                  <select 
+                    value={networkState.gameState.currentEnvironmentId || 'env-1'} 
+                    onchange={(e) => networkState.changeEnvironment(e.target.value)} 
+                    class="vtt-select"
                   >
-                    Gotei
-                  </button>
-                  <button 
-                    onclick={() => networkState.updateTheme('hueco-mundo')} 
-                    class="theme-btn {networkState.gameState.theme === 'hueco-mundo' ? 'active hueco-mundo' : ''}"
-                  >
-                    Hueco
-                  </button>
-                  <button 
-                    onclick={() => networkState.updateTheme('karakura-town')} 
-                    class="theme-btn {networkState.gameState.theme === 'karakura-town' ? 'active karakura-town' : ''}"
-                  >
-                    Karakura
-                  </button>
+                    {#each Object.values(networkState.gameState.environments || {}) as env}
+                      <option value={env.id}>{env.name}</option>
+                    {/each}
+                  </select>
                 </div>
+
+                <!-- Active Environment Configuration -->
+                {#if networkState.gameState.environments && networkState.gameState.environments[networkState.gameState.currentEnvironmentId || 'env-1']}
+                  {@const activeEnv = networkState.gameState.environments[networkState.gameState.currentEnvironmentId || 'env-1']}
+                  
+                  <!-- Rename Active Env -->
+                  <div class="control-row" style="margin-top: 0.5rem;">
+                    <span class="control-label">Nome:</span>
+                    <input 
+                      type="text" 
+                      value={activeEnv.name}
+                      onchange={(e) => networkState.renameEnvironment(activeEnv.id, e.target.value)}
+                      class="quick-hp-input"
+                      style="width: 100%; text-align: left; padding: 0.35rem 0.55rem; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff;"
+                    />
+                  </div>
+
+                  <!-- Select Theme -->
+                  <div class="control-row" style="margin-top: 0.5rem;">
+                    <span class="control-label">Tema:</span>
+                    <select 
+                      value={networkState.gameState.theme || 'soul-society'} 
+                      onchange={(e) => {
+                        networkState.updateTheme(e.target.value);
+                        activeEnv.theme = e.target.value;
+                      }} 
+                      class="vtt-select"
+                    >
+                      <option value="soul-society">Gotei 13 (Soul Society)</option>
+                      <option value="karakura-town">Karakura Town</option>
+                      <option value="hueco-mundo">Hueco Mundo</option>
+                    </select>
+                  </div>
+
+                  <!-- Upload Map for Active Environment -->
+                  <div class="control-row" style="margin-top: 0.5rem;">
+                    <span class="control-label">Mapa de Fundo:</span>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; width: 100%;">
+                      <label class="file-upload-btn" style="margin: 0; padding: 0.4rem 0.75rem; font-size: 0.78rem; flex: 1; text-align: center;">
+                        Carregar Imagem
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          onchange={handleBackgroundUpload} 
+                          style="display: none;"
+                        />
+                      </label>
+                      {#if networkState.gameState.backgroundImage}
+                        <button 
+                          onclick={() => networkState.updateBackgroundImage('')} 
+                          class="delete-piece-btn" 
+                          style="margin: 0; padding: 0.4rem 0.6rem; line-height: 1;"
+                          title="Remover Mapa"
+                        >
+                          ✕
+                        </button>
+                      {/if}
+                    </div>
+                  </div>
+
+                  <!-- Opacity Slider (Always show section if active background is present) -->
+                  {#if networkState.gameState.backgroundImage}
+                    <div class="control-row" style="margin-top: 0.5rem; flex-direction: column; align-items: stretch; gap: 0.25rem;">
+                      <div style="display: flex; justify-content: space-between; font-size: 0.78rem; color: #94a3b8;">
+                        <span>Opacidade do Mapa:</span>
+                        <span style="font-family: monospace;">{Math.round((networkState.gameState.backgroundImageOpacity ?? 1.0) * 100)}%</span>
+                      </div>
+                      <input 
+                        type="range" 
+                        min="0.1" 
+                        max="1.0" 
+                        step="0.05"
+                        value={networkState.gameState.backgroundImageOpacity ?? 1.0}
+                        oninput={(e) => networkState.updateBackgroundImageOpacity(Number(e.target.value))}
+                        style="width: 100%; cursor: pointer; accent-color: #a855f7;"
+                      />
+                    </div>
+                  {/if}
+
+                  <!-- Actions: Add and Delete Environment -->
+                  <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem;">
+                    <button 
+                      onclick={() => networkState.addEnvironment('')}
+                      class="vtt-btn btn-primary"
+                      style="flex: 1; padding: 0.4rem; font-size: 0.78rem; font-weight: bold;"
+                    >
+                      ➕ Novo Cenário
+                    </button>
+                    <button 
+                      onclick={() => networkState.deleteEnvironment(activeEnv.id)}
+                      disabled={Object.keys(networkState.gameState.environments || {}).length <= 1}
+                      class="vtt-btn btn-secondary"
+                      style="flex: 1; padding: 0.4rem; font-size: 0.78rem; font-weight: bold; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171;"
+                    >
+                      🗑 Excluir
+                    </button>
+                  </div>
+                {/if}
               </div>
             </div>
           {:else}

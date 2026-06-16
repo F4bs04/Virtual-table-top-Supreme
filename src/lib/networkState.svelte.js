@@ -30,6 +30,36 @@ export const networkState = $state({
     activePopupImage: '', // Fullscreen shared image URL
     recentRolls: [], // List of recent dice rolls
     activeParticles: [], // List of active particle burst events
+    currentEnvironmentId: 'env-1',
+    environments: {
+      'env-1': {
+        id: 'env-1',
+        name: 'Gotei 13 (Soul Society)',
+        theme: 'soul-society',
+        backgroundImage: '',
+        backgroundImageOpacity: 1.0,
+        pieces: {
+          'o-1': { id: 'o-1', name: 'Senkaimon Gate', class: 'objeto', x: 4, y: 0, z: 5, color: '#ffaa00', textureUrl: '', hp: null, maxHp: null, notes: '', photos: [] },
+          'o-2': { id: 'o-2', name: 'Reishi Barrier', class: 'objeto', x: 3, y: 0, z: 3, color: '#888888', textureUrl: '', hp: null, maxHp: null, notes: '', photos: [] }
+        }
+      },
+      'env-2': {
+        id: 'env-2',
+        name: 'Karakura Town',
+        theme: 'karakura-town',
+        backgroundImage: '',
+        backgroundImageOpacity: 1.0,
+        pieces: {}
+      },
+      'env-3': {
+        id: 'env-3',
+        name: 'Hueco Mundo',
+        theme: 'hueco-mundo',
+        backgroundImage: '',
+        backgroundImageOpacity: 1.0,
+        pieces: {}
+      }
+    },
     pieces: {
       'p-1': { id: 'p-1', name: 'Ichigo Kurosaki', class: 'personagem', x: 2, y: 0, z: 2, color: '#ff3e00', textureUrl: '/soldier.png', hp: 100, maxHp: 100, notes: '', photos: [] },
       'p-2': { id: 'p-2', name: 'Rukia Kuchiki', class: 'personagem', x: 5, y: 0, z: 3, color: '#00aaff', textureUrl: '/feiticeiro.png', hp: 100, maxHp: 100, notes: '', photos: [] },
@@ -719,7 +749,173 @@ export const networkState = $state({
       return;
     }
     networkState.gameState.backgroundImageOpacity = Math.max(0.0, Math.min(1.0, opacity));
+    
+    // Also save in current environment config if present
+    const envId = networkState.gameState.currentEnvironmentId || 'env-1';
+    if (networkState.gameState.environments && networkState.gameState.environments[envId]) {
+      networkState.gameState.environments[envId].backgroundImageOpacity = networkState.gameState.backgroundImageOpacity;
+    }
+
     networkState.broadcastGameState();
+  },
+
+  changeEnvironment(envId) {
+    if (networkState.role !== 'host') {
+      networkState.addLog('BLOCKED: Only the Host can change the environment.');
+      return;
+    }
+    const currentEnvId = networkState.gameState.currentEnvironmentId || 'env-1';
+    if (currentEnvId === envId) return;
+
+    // 1. Initialize environments map if not present
+    if (!networkState.gameState.environments) {
+      networkState.gameState.environments = {};
+    }
+    if (!networkState.gameState.environments[currentEnvId]) {
+      networkState.gameState.environments[currentEnvId] = {
+        id: currentEnvId,
+        name: currentEnvId === 'env-1' ? 'Gotei 13 (Soul Society)' : currentEnvId === 'env-2' ? 'Karakura Town' : 'Hueco Mundo',
+        theme: networkState.gameState.theme || 'soul-society',
+        backgroundImage: networkState.gameState.backgroundImage || '',
+        backgroundImageOpacity: networkState.gameState.backgroundImageOpacity ?? 1.0,
+        pieces: {}
+      };
+    }
+
+    // 2. Save current active objects (class === 'objeto')
+    const currentObjs = {};
+    Object.keys(networkState.gameState.pieces).forEach(pId => {
+      const piece = networkState.gameState.pieces[pId];
+      if (piece && piece.class === 'objeto') {
+        currentObjs[pId] = $state.snapshot(piece);
+        delete networkState.gameState.pieces[pId];
+      }
+    });
+    networkState.gameState.environments[currentEnvId].pieces = currentObjs;
+    // Also save current background settings in the environment config
+    networkState.gameState.environments[currentEnvId].theme = networkState.gameState.theme;
+    networkState.gameState.environments[currentEnvId].backgroundImage = networkState.gameState.backgroundImage;
+    networkState.gameState.environments[currentEnvId].backgroundImageOpacity = networkState.gameState.backgroundImageOpacity ?? 1.0;
+
+    // 3. Ensure new environment exists in list
+    const newEnv = networkState.gameState.environments[envId];
+    if (!newEnv) {
+      networkState.addLog(`Error: Environment ${envId} not found.`);
+      return;
+    }
+
+    // 4. Load new environment's objects
+    const newPieces = newEnv.pieces || {};
+    Object.keys(newPieces).forEach(pId => {
+      networkState.gameState.pieces[pId] = $state.snapshot(newPieces[pId]);
+    });
+
+    // 5. Update background / theme
+    networkState.gameState.theme = newEnv.theme || 'soul-society';
+    networkState.gameState.backgroundImage = newEnv.backgroundImage || '';
+    networkState.gameState.backgroundImageOpacity = newEnv.backgroundImageOpacity ?? 1.0;
+    networkState.gameState.currentEnvironmentId = envId;
+
+    networkState.addLog(`Environment switched to: ${newEnv.name}`);
+    networkState.broadcastGameState();
+  },
+
+  addEnvironment(name, theme = 'soul-society') {
+    if (networkState.role !== 'host') {
+      networkState.addLog('BLOCKED: Only the Host can add environments.');
+      return;
+    }
+    if (!networkState.gameState.environments) {
+      networkState.gameState.environments = {};
+    }
+    
+    // Auto-save current environment before adding and switching to the new one
+    const currentEnvId = networkState.gameState.currentEnvironmentId || 'env-1';
+    if (!networkState.gameState.environments[currentEnvId]) {
+      networkState.gameState.environments[currentEnvId] = {
+        id: currentEnvId,
+        name: currentEnvId === 'env-1' ? 'Gotei 13 (Soul Society)' : currentEnvId === 'env-2' ? 'Karakura Town' : 'Hueco Mundo',
+        theme: networkState.gameState.theme || 'soul-society',
+        backgroundImage: networkState.gameState.backgroundImage || '',
+        backgroundImageOpacity: networkState.gameState.backgroundImageOpacity ?? 1.0,
+        pieces: {}
+      };
+    }
+    const currentObjs = {};
+    Object.keys(networkState.gameState.pieces).forEach(pId => {
+      const piece = networkState.gameState.pieces[pId];
+      if (piece && piece.class === 'objeto') {
+        currentObjs[pId] = $state.snapshot(piece);
+      }
+    });
+    networkState.gameState.environments[currentEnvId].pieces = currentObjs;
+    networkState.gameState.environments[currentEnvId].theme = networkState.gameState.theme;
+    networkState.gameState.environments[currentEnvId].backgroundImage = networkState.gameState.backgroundImage;
+    networkState.gameState.environments[currentEnvId].backgroundImageOpacity = networkState.gameState.backgroundImageOpacity ?? 1.0;
+
+    const envId = `env-custom-${Date.now()}`;
+    const defaultName = `Ambiente ${Object.keys(networkState.gameState.environments).length + 1}`;
+    networkState.gameState.environments[envId] = {
+      id: envId,
+      name: name?.trim() || defaultName,
+      theme,
+      backgroundImage: '',
+      backgroundImageOpacity: 1.0,
+      pieces: {}
+    };
+
+    networkState.addLog(`Created new environment: ${networkState.gameState.environments[envId].name}`);
+    
+    // Switch to the newly created environment
+    // 1. Clear current active objects
+    Object.keys(networkState.gameState.pieces).forEach(pId => {
+      const piece = networkState.gameState.pieces[pId];
+      if (piece && piece.class === 'objeto') {
+        delete networkState.gameState.pieces[pId];
+      }
+    });
+    // 2. Apply new environment values
+    networkState.gameState.theme = theme;
+    networkState.gameState.backgroundImage = '';
+    networkState.gameState.backgroundImageOpacity = 1.0;
+    networkState.gameState.currentEnvironmentId = envId;
+
+    networkState.broadcastGameState();
+  },
+
+  deleteEnvironment(envId) {
+    if (networkState.role !== 'host') {
+      networkState.addLog('BLOCKED: Only the Host can delete environments.');
+      return;
+    }
+    if (!networkState.gameState.environments || !networkState.gameState.environments[envId]) return;
+    const keys = Object.keys(networkState.gameState.environments);
+    if (keys.length <= 1) {
+      networkState.addLog('BLOCKED: Cannot delete the last remaining environment.');
+      return;
+    }
+
+    const envName = networkState.gameState.environments[envId].name;
+
+    // If deleting the current environment, switch to another first
+    if (networkState.gameState.currentEnvironmentId === envId) {
+      const otherKey = keys.find(k => k !== envId);
+      networkState.changeEnvironment(otherKey);
+    }
+
+    delete networkState.gameState.environments[envId];
+    networkState.addLog(`Deleted environment: ${envName}`);
+    networkState.broadcastGameState();
+  },
+
+  renameEnvironment(envId, newName) {
+    if (networkState.role !== 'host') return;
+    if (networkState.gameState.environments && networkState.gameState.environments[envId] && newName.trim()) {
+      const oldName = networkState.gameState.environments[envId].name;
+      networkState.gameState.environments[envId].name = newName.trim();
+      networkState.addLog(`Renamed environment from "${oldName}" to "${newName.trim()}"`);
+      networkState.broadcastGameState();
+    }
   },
 
   // Update Theme
