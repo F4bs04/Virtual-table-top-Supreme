@@ -115,7 +115,21 @@
           {:else if networkState.activeTool === 'scale'}
             SELECT A PIECE // ADJUST SLIDERS IN RIGHT PANEL
           {:else if networkState.activeTool === 'particles'}
-            ✨ PARTICLES TOOL // CLICK THE GROUND TO TRIGGER REIATSUBURST
+            <div style="display: inline-flex; align-items: center; gap: 0.5rem; vertical-align: middle;">
+              <span>✨ Efeito:</span>
+              <select 
+                value={networkState.activeParticleType || 'burst'} 
+                onchange={(e) => { networkState.activeParticleType = e.target.value; }}
+                style="background: rgba(0, 0, 0, 0.75); border: 1px solid rgba(255, 255, 255, 0.25); color: #fff; padding: 0.15rem 0.45rem; border-radius: 4px; font-size: 0.75rem; cursor: pointer; outline: none; font-family: inherit;"
+              >
+                <option value="burst">Reiatsu Wave (Onda)</option>
+                <option value="falling">Partículas Caindo (Chuva)</option>
+                <option value="bubbles">Esferas Ascendentes (Bolinhas)</option>
+                <option value="lightning">Raios Espirituais (Raios)</option>
+                <option value="light">Explosão de Luz (Luz)</option>
+              </select>
+              <span style="opacity: 0.8; font-size: 0.75rem;">// CLIQUE NA GRADE PARA DETONAR</span>
+            </div>
           {:else if networkState.activeTool === 'draw-wall'}
             {#if networkState.drawingStartHex === null}
               🧱 CLICK TO SET WALL START POINT

@@ -15,6 +15,7 @@ export const networkState = $state({
   drawingStartHex: null, // { c, r } start corner of footprint drawing
   floorDrawingPoints: [], // Array of { c, r } points for polygon floors
   activeTool: 'hand', // 'hand' | 'move' | 'scale' | 'draw-wall' | 'draw-floor'
+  activeParticleType: 'burst', // 'burst' | 'falling' | 'bubbles' | 'lightning' | 'light'
   obstructedStructureIds: new Set(), // Set of structure IDs currently obstructing view of characters
   draggedPieceId: null, // ID of the piece currently being dragged by pointer
   draggedPieceStartHex: null, // { c, r } start hex of the piece before drag for move range validations
@@ -1305,7 +1306,7 @@ export const networkState = $state({
   },
 
   // Trigger a GM spiritual burst/particles
-  triggerParticles(x, z) {
+  triggerParticles(x, z, effectType = 'burst') {
     if (networkState.role !== 'host') {
       networkState.addLog('BLOCKED: Only the Host can trigger particles.');
       return;
@@ -1314,10 +1315,11 @@ export const networkState = $state({
       id: `burst-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       x,
       z,
+      effectType,
       timestamp: Date.now()
     };
     networkState.gameState.activeParticles = [burst, ...networkState.gameState.activeParticles.slice(0, 4)];
-    networkState.addLog(`GM triggered a Spiritual Reiatsu Burst at (${x}, ${z})!`);
+    networkState.addLog(`GM triggered a ${effectType} particle effect at (${x}, ${z})!`);
     networkState.broadcastGameState();
   },
 

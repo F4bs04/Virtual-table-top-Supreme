@@ -459,7 +459,7 @@
 
     if (networkState.activeTool === 'particles') {
       if (networkState.role === 'host') {
-        networkState.triggerParticles(targetX, targetZ);
+        networkState.triggerParticles(targetX, targetZ, networkState.activeParticleType || 'burst');
       } else {
         networkState.addLog('BLOCKED: Only the Host (Master) can trigger particle bursts.');
       }
@@ -585,21 +585,111 @@
 
 <!-- GM Spiritual Burst Particle Effects -->
 {#each (networkState.gameState.activeParticles || []) as burst (burst.id)}
+  {@const effectType = burst.effectType || 'burst'}
   {@const age = frameTime - burst.timestamp}
-  {#if age < 1500}
-    {@const scaleVal = 0.1 + (age / 1500) * 3.5}
-    {@const opacityVal = 1.0 - (age / 1500)}
-    {@const burstWorld = hexToWorld(burst.x, burst.z)}
-    <!-- Expanding Spiritual Ring 1 -->
-    <T.Mesh position={[burstWorld.x, 0.06, burstWorld.z]} rotation={[-Math.PI / 2, 0, 0]} scale={[scaleVal, scaleVal, 1]}>
-      <T.RingGeometry args={[0.8, 1.0, 32]} />
-      <T.MeshBasicMaterial color={gridColor} transparent opacity={opacityVal * 0.8} side={THREE.DoubleSide} />
-    </T.Mesh>
-    <!-- Expanding Inner Ring 2 (Red Core) -->
-    <T.Mesh position={[burstWorld.x, 0.07, burstWorld.z]} rotation={[-Math.PI / 2, 0, 0]} scale={[scaleVal * 0.6, scaleVal * 0.6, 1]}>
-      <T.RingGeometry args={[0.0, 0.5, 32]} />
-      <T.MeshBasicMaterial color="#ef4444" transparent opacity={opacityVal * 0.6} side={THREE.DoubleSide} />
-    </T.Mesh>
+  
+  {#if effectType === 'burst'}
+    {#if age < 1500}
+      {@const scaleVal = 0.1 + (age / 1500) * 3.5}
+      {@const opacityVal = 1.0 - (age / 1500)}
+      {@const burstWorld = hexToWorld(burst.x, burst.z)}
+      <!-- Expanding Spiritual Ring 1 -->
+      <T.Mesh position={[burstWorld.x, 0.06, burstWorld.z]} rotation={[-Math.PI / 2, 0, 0]} scale={[scaleVal, scaleVal, 1]}>
+        <T.RingGeometry args={[0.8, 1.0, 32]} />
+        <T.MeshBasicMaterial color={gridColor} transparent opacity={opacityVal * 0.8} side={THREE.DoubleSide} />
+      </T.Mesh>
+      <!-- Expanding Inner Ring 2 (Red Core) -->
+      <T.Mesh position={[burstWorld.x, 0.07, burstWorld.z]} rotation={[-Math.PI / 2, 0, 0]} scale={[scaleVal * 0.6, scaleVal * 0.6, 1]}>
+        <T.RingGeometry args={[0.0, 0.5, 32]} />
+        <T.MeshBasicMaterial color="#ef4444" transparent opacity={opacityVal * 0.6} side={THREE.DoubleSide} />
+      </T.Mesh>
+    {/if}
+
+  {:else if effectType === 'falling'}
+    {#if age < 1500}
+      {@const burstWorld = hexToWorld(burst.x, burst.z)}
+      {@const progress = age / 1500}
+      <!-- Render 8 falling particles -->
+      {#each [
+        { dx: -0.3, dz: -0.2, speed: 1.0, size: 0.07, delay: 0.0 },
+        { dx: 0.4, dz: 0.3, speed: 1.2, size: 0.05, delay: 0.15 },
+        { dx: -0.1, dz: 0.4, speed: 0.9, size: 0.08, delay: 0.05 },
+        { dx: 0.2, dz: -0.4, speed: 1.1, size: 0.06, delay: 0.2 },
+        { dx: -0.4, dz: 0.1, speed: 1.3, size: 0.04, delay: 0.1 },
+        { dx: 0.3, dz: -0.1, speed: 0.8, size: 0.09, delay: 0.25 },
+        { dx: 0.0, dz: 0.0, speed: 1.0, size: 0.10, delay: 0.0 },
+        { dx: -0.2, dz: -0.3, speed: 1.15, size: 0.05, delay: 0.3 }
+      ] as offset}
+        {@const pProgress = ((progress * offset.speed) + offset.delay) % 1.0}
+        {@const pY = 4.0 - pProgress * 4.0}
+        {@const opacityVal = (1.0 - pProgress) * (1.0 - progress)}
+        <T.Mesh position={[burstWorld.x + offset.dx, pY, burstWorld.z + offset.dz]}>
+          <T.SphereGeometry args={[offset.size, 8, 8]} />
+          <T.MeshBasicMaterial color={gridColor} transparent opacity={opacityVal} />
+        </T.Mesh>
+      {/each}
+    {/if}
+
+  {:else if effectType === 'bubbles'}
+    {#if age < 1500}
+      {@const burstWorld = hexToWorld(burst.x, burst.z)}
+      {@const progress = age / 1500}
+      <!-- Render 8 rising bubble orbs -->
+      {#each [
+        { dx: -0.2, dz: -0.1, speed: 1.1, size: 0.08, delay: 0.0 },
+        { dx: 0.3, dz: 0.2, speed: 0.9, size: 0.10, delay: 0.1 },
+        { dx: -0.3, dz: 0.3, speed: 1.2, size: 0.06, delay: 0.05 },
+        { dx: 0.1, dz: -0.3, speed: 1.0, size: 0.07, delay: 0.15 },
+        { dx: -0.1, dz: 0.1, speed: 0.8, size: 0.12, delay: 0.2 },
+        { dx: 0.2, dz: -0.1, speed: 1.3, size: 0.05, delay: 0.25 },
+        { dx: 0.0, dz: 0.0, speed: 1.0, size: 0.14, delay: 0.0 },
+        { dx: -0.3, dz: -0.2, speed: 0.75, size: 0.11, delay: 0.3 }
+      ] as offset}
+        {@const pProgress = ((progress * offset.speed) + offset.delay) % 1.0}
+        {@const pY = 0.05 + pProgress * 3.0}
+        {@const opacityVal = (1.0 - pProgress) * (1.0 - progress)}
+        <T.Mesh position={[burstWorld.x + offset.dx, pY, burstWorld.z + offset.dz]}>
+          <T.SphereGeometry args={[offset.size, 8, 8]} />
+          <T.MeshBasicMaterial color="#38bdf8" transparent opacity={opacityVal} />
+        </T.Mesh>
+      {/each}
+    {/if}
+
+  {:else if effectType === 'lightning'}
+    {#if age < 1000}
+      {@const burstWorld = hexToWorld(burst.x, burst.z)}
+      {@const progress = age / 1000}
+      {@const flicker = Math.sin(age * 0.08) > 0}
+      {@const opacityVal = (flicker ? 0.95 : 0.25) * (1.0 - progress)}
+      <!-- Vertical Glowing Cylinder for the main strike -->
+      <T.Mesh position={[burstWorld.x, 3.0, burstWorld.z]}>
+        <T.CylinderGeometry args={[0.08, 0.15, 6.0, 8]} />
+        <T.MeshBasicMaterial color="#fbbf24" transparent opacity={opacityVal} />
+      </T.Mesh>
+      <!-- Ground flash ring -->
+      <T.Mesh position={[burstWorld.x, 0.06, burstWorld.z]} rotation={[-Math.PI / 2, 0, 0]}>
+        <T.RingGeometry args={[0.0, 1.2, 32]} />
+        <T.MeshBasicMaterial color="#fbbf24" transparent opacity={opacityVal * 0.5} side={THREE.DoubleSide} />
+      </T.Mesh>
+    {/if}
+
+  {:else if effectType === 'light'}
+    {#if age < 1500}
+      {@const burstWorld = hexToWorld(burst.x, burst.z)}
+      {@const progress = age / 1500}
+      {@const scaleVal = 0.1 + progress * 2.8}
+      {@const opacityVal = Math.sin(progress * Math.PI) * 0.95}
+      <!-- Growing glowing sphere -->
+      <T.Mesh position={[burstWorld.x, 0.8, burstWorld.z]} scale={[scaleVal, scaleVal, scaleVal]}>
+        <T.SphereGeometry args={[0.8, 16, 16]} />
+        <T.MeshBasicMaterial color="#ffffff" transparent opacity={opacityVal} />
+      </T.Mesh>
+      <!-- Outer flare ring -->
+      <T.Mesh position={[burstWorld.x, 0.06, burstWorld.z]} rotation={[-Math.PI / 2, 0, 0]} scale={[scaleVal * 1.5, scaleVal * 1.5, 1]}>
+        <T.RingGeometry args={[0, 1.0, 32]} />
+        <T.MeshBasicMaterial color={gridColor} transparent opacity={opacityVal * 0.6} side={THREE.DoubleSide} />
+      </T.Mesh>
+    {/if}
   {/if}
 {/each}
 
