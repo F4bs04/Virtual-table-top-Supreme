@@ -571,7 +571,7 @@
 {#key hexGridPoints.length + '-' + networkState.currentViewLevel}
   <T.LineSegments position={[0, (networkState.currentViewLevel - 1) * 2.0, 0]} frustumCulled={false}>
     <T.BufferGeometry bind:ref={bufferGeometry} />
-    <T.LineBasicMaterial color={gridColor} transparent opacity={0.28} />
+    <T.LineBasicMaterial color={gridColor} transparent opacity={0.65} />
   </T.LineSegments>
 {/key}
 
