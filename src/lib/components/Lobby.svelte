@@ -441,6 +441,23 @@
                   {/if}
                 </div>
               </div>
+              {#if networkState.gameState.backgroundImage}
+                <div class="control-row" style="flex-direction: column; align-items: stretch; gap: 0.25rem;">
+                  <div style="display: flex; justify-content: space-between; font-size: 0.78rem; color: #94a3b8;">
+                    <span>Map Opacity:</span>
+                    <span style="font-family: monospace;">{Math.round((networkState.gameState.backgroundImageOpacity ?? 1.0) * 100)}%</span>
+                  </div>
+                  <input 
+                    type="range" 
+                    min="0.1" 
+                    max="1.0" 
+                    step="0.05"
+                    value={networkState.gameState.backgroundImageOpacity ?? 1.0}
+                    oninput={(e) => networkState.updateBackgroundImageOpacity(Number(e.target.value))}
+                    style="width: 100%; cursor: pointer; accent-color: #a855f7;"
+                  />
+                </div>
+              {/if}
 
               <!-- Ambient Theme Selector -->
               <div class="control-row">

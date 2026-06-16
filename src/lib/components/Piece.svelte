@@ -224,7 +224,9 @@
   // Effect to manage default texture creation
   $effect(() => {
     defaultTexture = createDefaultAvatar(name, color, pieceClass === 'objeto');
-    activeTexture = defaultTexture;
+    if (!textureUrl) {
+      activeTexture = defaultTexture;
+    }
 
     return () => {
       if (defaultTexture) defaultTexture.dispose();
@@ -301,6 +303,21 @@
         side={THREE.DoubleSide} 
         transparent={true}
         opacity={(0.8 + Math.sin(Date.now() * 0.005) * 0.2) * opacityMultiplier} 
+      />
+    </T.Mesh>
+  {/if}
+
+  <!-- Floating Bouncing Selection Arrow -->
+  {#if isSelected && pieceClass === 'personagem'}
+    <T.Mesh 
+      position={[0, (1.65 + Math.sin(Date.now() * 0.007) * 0.12 + visualY) * scale, 0]} 
+      rotation={[Math.PI, Date.now() * 0.003, 0]}
+    >
+      <T.ConeGeometry args={[0.16 * scale, 0.38 * scale, 5]} />
+      <T.MeshBasicMaterial 
+        color={color} 
+        transparent={true} 
+        opacity={opacityMultiplier} 
       />
     </T.Mesh>
   {/if}

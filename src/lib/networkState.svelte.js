@@ -25,6 +25,7 @@ export const networkState = $state({
     gridSize: 24,
     theme: 'soul-society',
     backgroundImage: '',
+    backgroundImageOpacity: 1.0,
     basicPlaneSize: 'medium', // 'small' | 'medium' | 'large'
     activePopupImage: '', // Fullscreen shared image URL
     recentRolls: [], // List of recent dice rolls
@@ -709,6 +710,15 @@ export const networkState = $state({
     }
     networkState.gameState.backgroundImage = url;
     networkState.addLog('Background map image updated.');
+    networkState.broadcastGameState();
+  },
+
+  updateBackgroundImageOpacity(opacity) {
+    if (networkState.role !== 'host') {
+      networkState.addLog('BLOCKED: Only the Host can change background opacity.');
+      return;
+    }
+    networkState.gameState.backgroundImageOpacity = Math.max(0.0, Math.min(1.0, opacity));
     networkState.broadcastGameState();
   },
 

@@ -722,7 +722,12 @@
   {#key gridSize}
     <T.Mesh position={[gridSize / 2, -0.012, zMax / 2]} rotation={[-Math.PI / 2, 0, 0]} frustumCulled={false}>
       <T.PlaneGeometry args={[gridSize, zMax]} />
-      <T.MeshBasicMaterial map={backgroundTexture} side={THREE.DoubleSide} />
+      <T.MeshBasicMaterial 
+        map={backgroundTexture} 
+        side={THREE.DoubleSide} 
+        transparent={true}
+        opacity={networkState.gameState.backgroundImageOpacity ?? 1.0}
+      />
     </T.Mesh>
   {/key}
 {/if}
