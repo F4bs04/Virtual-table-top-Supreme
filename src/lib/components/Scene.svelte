@@ -146,6 +146,7 @@
 
   const selectedPiece = $derived(networkState.selectedPieceId ? networkState.gameState.pieces[networkState.selectedPieceId] : null);
   const movementHexes = $derived.by(() => {
+    if (networkState.activeTool === 'select') return [];
     if (!selectedPiece || selectedPiece.class !== 'personagem') return [];
     const neighbors = [];
     const cs = selectedPiece.x;
@@ -369,6 +370,11 @@
   // Handle clicking on the ground grid
   function handleGroundClick(e) {
     e.stopPropagation();
+
+    if (networkState.activeTool === 'select') {
+      networkState.selectedPieceId = null;
+      return;
+    }
 
     const { x, z } = e.point;
     const snapped = worldToHex(x, z);

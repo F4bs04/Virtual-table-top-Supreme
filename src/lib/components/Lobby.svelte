@@ -305,8 +305,8 @@
                       ✋ Camera Hand
                     {:else if networkState.activeTool === 'move'}
                       🎯 Move Tool
-                    {:else if networkState.activeTool === 'scale'}
-                      📐 Scale Tool
+                    {:else if networkState.activeTool === 'select'}
+                      🔍 Select Tool
                     {:else if networkState.activeTool === 'draw-wall'}
                       🧱 Wall drawing
                     {:else if networkState.activeTool === 'draw-floor'}

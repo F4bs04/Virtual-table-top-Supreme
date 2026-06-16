@@ -14,7 +14,7 @@ export const networkState = $state({
   drawingMode: false, // drawing active state for GM
   drawingStartHex: null, // { c, r } start corner of footprint drawing
   floorDrawingPoints: [], // Array of { c, r } points for polygon floors
-  activeTool: 'hand', // 'hand' | 'move' | 'scale' | 'draw-wall' | 'draw-floor'
+  activeTool: 'hand', // 'hand' | 'move' | 'select' | 'draw-wall' | 'draw-floor'
   activeParticleType: 'burst', // 'burst' | 'falling' | 'bubbles' | 'lightning' | 'light'
   obstructedStructureIds: new Set(), // Set of structure IDs currently obstructing view of characters
   draggedPieceId: null, // ID of the piece currently being dragged by pointer

@@ -260,6 +260,20 @@
 
     const buildMode = networkState.gameState.buildMode;
 
+    if (networkState.activeTool === 'select') {
+      if (pieceClass === 'personagem' && buildMode) {
+        networkState.addLog(`BLOCKED: Cannot select characters while Build Mode is active.`);
+        return;
+      }
+      if (pieceClass === 'objeto' && !buildMode) {
+        networkState.addLog(`Selected object: ${name}. Enable Build Mode as GM to select.`);
+        return;
+      }
+      networkState.selectedPieceId = id;
+      networkState.addLog(`Selected ${pieceClass === 'personagem' ? 'character' : 'object'}: ${name} (Select Mode).`);
+      return;
+    }
+
     if (pieceClass === 'personagem') {
       if (buildMode) {
         networkState.addLog(`BLOCKED: Cannot select or move characters while Build Mode is active.`);

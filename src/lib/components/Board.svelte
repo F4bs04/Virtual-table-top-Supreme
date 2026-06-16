@@ -109,8 +109,8 @@
             LEFT DRAG TO PAN // RIGHT DRAG TO ROTATE // WHEEL TO ZOOM
           {:else if networkState.activeTool === 'move'}
             SELECT A PIECE // CLICK GROUND TO MOVE IT
-          {:else if networkState.activeTool === 'scale'}
-            SELECT A PIECE // ADJUST SLIDERS IN RIGHT PANEL
+          {:else if networkState.activeTool === 'select'}
+            CLICK A PIECE TO SELECT IT // NO MOVEMENT ALLOWED
           {:else if networkState.activeTool === 'particles'}
             <div style="display: inline-flex; align-items: center; gap: 0.5rem; vertical-align: middle;">
               <span>✨ Efeito:</span>
@@ -184,17 +184,17 @@
       </button>
 
       <button 
-        class="tool-btn {networkState.activeTool === 'scale' ? 'active' : ''}" 
+        class="tool-btn {networkState.activeTool === 'select' ? 'active' : ''}" 
         onclick={() => { 
-          networkState.activeTool = 'scale'; 
+          networkState.activeTool = 'select'; 
           networkState.drawingMode = false; 
           networkState.drawingStartHex = null;
-          networkState.addLog('Scale Tool activated (Adjust geometry sliders)');
+          networkState.addLog('Select Tool activated (Click to select pieces without moving them)');
         }}
-        title="Scale Tool (Resize & Texture)"
+        title="Select Tool (Click to select pieces)"
       >
-        <span class="tool-icon">📐</span>
-        <span class="tool-label">Scale</span>
+        <span class="tool-icon">🔍</span>
+        <span class="tool-label">Select</span>
       </button>
 
       <button 
