@@ -597,6 +597,17 @@
                   <span class="prop-val">{(piece.scale ?? 1.0).toFixed(1)}x</span>
                 </div>
               </div>
+              <div class="prop-row" style="display: flex; align-items: center; justify-content: space-between; padding: 0.25rem 0;">
+                <label class="prop-label" style="margin: 0; cursor: pointer;">Inverter Imagem</label>
+                <input
+                  type="checkbox"
+                  checked={piece.flipX ?? false}
+                  onchange={(e) => {
+                    networkState.updatePieceDetails(piece.id, { flipX: e.target.checked });
+                  }}
+                  style="width: 1.2rem; height: 1.2rem; cursor: pointer; accent-color: #a855f7;"
+                />
+              </div>
             {/if}
           </div>
         </section>

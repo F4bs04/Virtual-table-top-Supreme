@@ -416,6 +416,9 @@ export const networkState = $state({
     if (typeof updates.scale === 'number') {
       piece.scale = updates.scale;
     }
+    if (typeof updates.flipX === 'boolean') {
+      piece.flipX = updates.flipX;
+    }
 
     networkState.addLog(`Updated asset details: ${piece.name}`);
     networkState.broadcastGameState();

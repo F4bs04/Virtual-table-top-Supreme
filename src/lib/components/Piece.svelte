@@ -56,6 +56,7 @@
   const pieceData = $derived(networkState.gameState.pieces[id]);
   const isDead = $derived(pieceData?.dead ?? false);
   const isStunned = $derived(pieceData?.stunned ?? false);
+  const flipX = $derived(pieceData?.flipX ?? false);
 
   const { camera } = useThrelte();
 
@@ -308,7 +309,7 @@
   <T.Group bind:ref={meshRef}>
     {#if activeTexture}
       <T.Mesh 
-        scale={[(isHovered ? 1.4 : 1.2) * scale, (isHovered ? 1.4 : 1.2) * scale, 1]}
+        scale={[(isHovered ? 1.4 : 1.2) * scale * (flipX ? -1 : 1), (isHovered ? 1.4 : 1.2) * scale, 1]}
         position={[0, (0.6 + visualY) * scale, 0]}
         onpointerdown={handlePointerDown}
         onpointerover={() => { isHovered = true; }}
