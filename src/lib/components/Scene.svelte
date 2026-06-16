@@ -693,13 +693,18 @@
   {/if}
 {/each}
 
-<!-- Hover Highlight -->
+<!-- Hover Highlight: subtle thin glow ring only, no fill -->
 {#if hoveredHex}
   {@const hoverPos = hexToWorld(hoveredHex.c, hoveredHex.r)}
-  <!-- Subtle outline ring for hex hover indicator -->
-  <T.Mesh position={[hoverPos.x, 0.015, hoverPos.z]} rotation={[-Math.PI / 2, 0, Math.PI / 6]}>
-    <T.RingGeometry args={[1 / Math.sqrt(3) - 0.03, 1 / Math.sqrt(3), 6]} />
-    <T.MeshBasicMaterial color={gridColor} transparent opacity={0.75} side={THREE.DoubleSide} />
+  <!-- Outer thin ring -->
+  <T.Mesh position={[hoverPos.x, 0.018, hoverPos.z]} rotation={[-Math.PI / 2, 0, Math.PI / 6]}>
+    <T.RingGeometry args={[1 / Math.sqrt(3) - 0.06, 1 / Math.sqrt(3) - 0.01, 6]} />
+    <T.MeshBasicMaterial color={gridColor} transparent opacity={0.45} side={THREE.DoubleSide} depthWrite={false} />
+  </T.Mesh>
+  <!-- Inner subtle fill, very low opacity -->
+  <T.Mesh position={[hoverPos.x, 0.016, hoverPos.z]} rotation={[-Math.PI / 2, 0, Math.PI / 6]}>
+    <T.RingGeometry args={[0, 1 / Math.sqrt(3) - 0.06, 6]} />
+    <T.MeshBasicMaterial color={gridColor} transparent opacity={0.08} side={THREE.DoubleSide} depthWrite={false} />
   </T.Mesh>
 {/if}
 
