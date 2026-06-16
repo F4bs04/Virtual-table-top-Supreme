@@ -77,9 +77,6 @@
         }, 4000); // Display for 4 seconds
       }
     }
-    return () => {
-      if (rollBannerTimeout) clearTimeout(rollBannerTimeout);
-    };
   });
 
   let showInstruction = $state(true);
@@ -324,13 +321,22 @@
 
   <!-- Floating Dice Roll Banner -->
   {#if activeRollBanner}
-    <div class="floating-roll-banner slide-down">
-      <div class="roll-banner-content">
+    <div class="floating-roll-banner slide-down" onclick={() => activeRollBanner = null} style="cursor: pointer;" title="Clique para fechar">
+      <div class="roll-banner-content" style="position: relative; padding-right: 2rem;">
         <span class="roll-die-icon">🎲</span>
         <span class="roll-banner-text">
           <strong>{activeRollBanner.name}</strong> rolou <strong>{activeRollBanner.die}</strong>:
         </span>
         <span class="roll-result-badge">{activeRollBanner.result}</span>
+        <button 
+          onclick={(e) => { e.stopPropagation(); activeRollBanner = null; }} 
+          style="background: none; border: none; color: rgba(255,255,255,0.4); font-size: 0.8rem; font-weight: bold; cursor: pointer; position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); transition: color 0.2s;"
+          onmouseover={(e) => e.target.style.color = '#fff'}
+          onmouseout={(e) => e.target.style.color = 'rgba(255,255,255,0.4)'}
+          title="Fechar"
+        >
+          ✕
+        </button>
       </div>
     </div>
   {/if}
