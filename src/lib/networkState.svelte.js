@@ -25,7 +25,7 @@ export const networkState = $state({
     buildMode: false,
     gridSize: 24,
     theme: 'soul-society',
-    backgroundImage: '',
+    backgroundImage: '/mapa.jpeg',
     backgroundImageOpacity: 1.0,
     basicPlaneSize: 'medium', // 'small' | 'medium' | 'large'
     activePopupImage: '', // Fullscreen shared image URL
@@ -37,11 +37,11 @@ export const networkState = $state({
         id: 'env-1',
         name: 'Gotei 13 (Soul Society)',
         theme: 'soul-society',
-        backgroundImage: '',
+        backgroundImage: '/mapa.jpeg',
         backgroundImageOpacity: 1.0,
         pieces: {
-          'o-1': { id: 'o-1', name: 'Senkaimon Gate', class: 'objeto', x: 4, y: 0, z: 5, color: '#ffaa00', textureUrl: '', hp: null, maxHp: null, notes: '', photos: [] },
-          'o-2': { id: 'o-2', name: 'Reishi Barrier', class: 'objeto', x: 3, y: 0, z: 3, color: '#888888', textureUrl: '', hp: null, maxHp: null, notes: '', photos: [] }
+          'o-1': { id: 'o-1', name: 'Barril', class: 'objeto', x: 4, y: 0, z: 5, color: '#d97706', textureUrl: '/barril.png', hp: null, maxHp: null, notes: 'Barril de madeira contendo suprimentos', photos: [] },
+          'o-2': { id: 'o-2', name: 'Baú', class: 'objeto', x: 3, y: 0, z: 3, color: '#f59e0b', textureUrl: '/bau.png', hp: null, maxHp: null, notes: 'Baú de tesouro trancado', photos: [] }
         }
       },
       'env-2': {
@@ -62,10 +62,12 @@ export const networkState = $state({
       }
     },
     pieces: {
-      'p-1': { id: 'p-1', name: 'Ichigo Kurosaki', class: 'personagem', x: 2, y: 0, z: 2, color: '#ff3e00', textureUrl: '/soldier.png', hp: 100, maxHp: 100, notes: '', photos: [] },
-      'p-2': { id: 'p-2', name: 'Rukia Kuchiki', class: 'personagem', x: 5, y: 0, z: 3, color: '#00aaff', textureUrl: '/feiticeiro.png', hp: 100, maxHp: 100, notes: '', photos: [] },
-      'o-1': { id: 'o-1', name: 'Senkaimon Gate', class: 'objeto', x: 4, y: 0, z: 5, color: '#ffaa00', textureUrl: '', hp: null, maxHp: null, notes: '', photos: [] },
-      'o-2': { id: 'o-2', name: 'Reishi Barrier', class: 'objeto', x: 3, y: 0, z: 3, color: '#888888', textureUrl: '', hp: null, maxHp: null, notes: '', photos: [] }
+      'p-1': { id: 'p-1', name: 'Ichigo Kurosaki', class: 'personagem', x: 2, y: 0, z: 2, color: '#ff3e00', textureUrl: '/soldier.png', hp: 100, maxHp: 100, notes: 'Ceifador de Almas Substituto', photos: [] },
+      'p-2': { id: 'p-2', name: 'Rukia Kuchiki', class: 'personagem', x: 5, y: 0, z: 3, color: '#00aaff', textureUrl: '/feiticeiro.png', hp: 100, maxHp: 100, notes: 'Tenente da 13ª Divisão', photos: [] },
+      'p-3': { id: 'p-3', name: 'Guarda', class: 'personagem', x: 4, y: 0, z: 1, color: '#10b981', textureUrl: '/guarda.png', hp: 80, maxHp: 80, notes: 'Guarda do Seireitei', photos: [] },
+      'p-4': { id: 'p-4', name: 'Monstro', class: 'personagem', x: 7, y: 0, z: 4, color: '#ef4444', textureUrl: '/monstro.png', hp: 120, maxHp: 120, notes: 'Hollow selvagem', photos: [] },
+      'o-1': { id: 'o-1', name: 'Barril', class: 'objeto', x: 4, y: 0, z: 5, color: '#d97706', textureUrl: '/barril.png', hp: null, maxHp: null, notes: 'Barril de madeira contendo suprimentos', photos: [] },
+      'o-2': { id: 'o-2', name: 'Baú', class: 'objeto', x: 3, y: 0, z: 3, color: '#f59e0b', textureUrl: '/bau.png', hp: null, maxHp: null, notes: 'Baú de tesouro trancado', photos: [] }
     }
   },
 
