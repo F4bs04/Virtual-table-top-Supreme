@@ -37,6 +37,26 @@
   let isHovered = $state(false);
   let meshRef = $state(null);
 
+  // Status textures loading
+  let deadTexture = $state(null);
+  let stunnedTexture = $state(null);
+
+  $effect(() => {
+    const loader = new THREE.TextureLoader();
+    loader.load('/death_state.png', (tex) => {
+      tex.colorSpace = THREE.SRGBColorSpace;
+      deadTexture = tex;
+    });
+    loader.load('/Stun_icon.png', (tex) => {
+      tex.colorSpace = THREE.SRGBColorSpace;
+      stunnedTexture = tex;
+    });
+  });
+
+  const pieceData = $derived(networkState.gameState.pieces[id]);
+  const isDead = $derived(pieceData?.dead ?? false);
+  const isStunned = $derived(pieceData?.stunned ?? false);
+
   const { camera } = useThrelte();
 
   // Visual effects and animation state
@@ -284,25 +304,83 @@
     </T.Mesh>
   {/if}
 
-  <!-- Interactive Billboard Mesh -->
-  {#if activeTexture}
-    <T.Mesh 
-      bind:ref={meshRef}
-      scale={[(isHovered ? 1.4 : 1.2) * scale, (isHovered ? 1.4 : 1.2) * scale, 1]}
-      position={[0, (0.6 + visualY) * scale, 0]}
-      onpointerdown={handlePointerDown}
-      onpointerover={() => { isHovered = true; }}
-      onpointerout={() => { isHovered = false; }}
-    >
-      <T.PlaneGeometry args={[1, 1]} />
-      <T.MeshBasicMaterial 
-        map={activeTexture}
-        color={overlayColor}
-        transparent={true}
-        alphaTest={currentAlphaTest}
-        opacity={opacityMultiplier}
-        side={THREE.DoubleSide}
-      />
-    </T.Mesh>
-  {/if}
+  <!-- Interactive Billboard Group -->
+  <T.Group bind:ref={meshRef}>
+    {#if activeTexture}
+      <T.Mesh 
+        scale={[(isHovered ? 1.4 : 1.2) * scale, (isHovered ? 1.4 : 1.2) * scale, 1]}
+        position={[0, (0.6 + visualY) * scale, 0]}
+        onpointerdown={handlePointerDown}
+        onpointerover={() => { isHovered = true; }}
+        onpointerout={() => { isHovered = false; }}
+      >
+        <T.PlaneGeometry args={[1, 1]} />
+        <T.MeshBasicMaterial 
+          map={activeTexture}
+          color={overlayColor}
+          transparent={true}
+          alphaTest={currentAlphaTest}
+          opacity={opacityMultiplier}
+          side={THREE.DoubleSide}
+        />
+      </T.Mesh>
+    {/if}
+
+    <!-- Status Icons hovering above character token -->
+    {#if pieceClass === 'personagem'}
+      {#if isDead && isStunned}
+        <!-- Render both side-by-side above character token -->
+        {#if deadTexture}
+          <T.Mesh position={[-0.22 * scale, (1.35 + visualY) * scale, 0.01]} scale={[0.35 * scale, 0.35 * scale, 1]}>
+            <T.PlaneGeometry args={[1, 1]} />
+            <T.MeshBasicMaterial 
+              map={deadTexture} 
+              transparent={true} 
+              opacity={opacityMultiplier} 
+              side={THREE.DoubleSide}
+              alphaTest={0.05}
+            />
+          </T.Mesh>
+        {/if}
+        {#if stunnedTexture}
+          <T.Mesh position={[0.22 * scale, (1.35 + visualY) * scale, 0.01]} scale={[0.35 * scale, 0.35 * scale, 1]}>
+            <T.PlaneGeometry args={[1, 1]} />
+            <T.MeshBasicMaterial 
+              map={stunnedTexture} 
+              transparent={true} 
+              opacity={opacityMultiplier} 
+              side={THREE.DoubleSide}
+              alphaTest={0.05}
+            />
+          </T.Mesh>
+        {/if}
+      {:else if isDead}
+        {#if deadTexture}
+          <T.Mesh position={[0, (1.35 + visualY) * scale, 0.01]} scale={[0.4 * scale, 0.4 * scale, 1]}>
+            <T.PlaneGeometry args={[1, 1]} />
+            <T.MeshBasicMaterial 
+              map={deadTexture} 
+              transparent={true} 
+              opacity={opacityMultiplier} 
+              side={THREE.DoubleSide}
+              alphaTest={0.05}
+            />
+          </T.Mesh>
+        {/if}
+      {:else if isStunned}
+        {#if stunnedTexture}
+          <T.Mesh position={[0, (1.35 + visualY) * scale, 0.01]} scale={[0.4 * scale, 0.4 * scale, 1]}>
+            <T.PlaneGeometry args={[1, 1]} />
+            <T.MeshBasicMaterial 
+              map={stunnedTexture} 
+              transparent={true} 
+              opacity={opacityMultiplier} 
+              side={THREE.DoubleSide}
+              alphaTest={0.05}
+            />
+          </T.Mesh>
+        {/if}
+      {/if}
+    {/if}
+  </T.Group>
 </T.Group>

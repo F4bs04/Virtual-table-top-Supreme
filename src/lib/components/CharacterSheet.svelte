@@ -247,11 +247,13 @@
         </section>
       {/if}
 
-      <!-- ── Efeitos Visuais / Visual Effects ──────────────────── -->
+      <!-- ── Efeitos ───────────────────────────────────────────── -->
       {#if piece.class === 'personagem'}
         <section class="sheet-section">
-          <h3 class="section-label">✨ Efeitos de Animação</h3>
-          <div class="effect-buttons" style="display: flex; gap: 0.5rem; margin-top: 0.4rem;">
+          <h3 class="section-label">✨ Efeitos</h3>
+          
+          <div style="font-size: 0.72rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.35rem; font-weight: 600;">Animações de Impacto</div>
+          <div class="effect-buttons" style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
             <button 
               class="effect-btn damage-effect-btn" 
               onclick={() => networkState.triggerPieceEffect(piece.id, 'damage')}
@@ -269,6 +271,26 @@
               onmouseout={(e) => { e.target.style.background = 'rgba(34, 197, 94, 0.15)'; e.target.style.color = '#4ade80'; }}
             >
               💚 Cura (Verde)
+            </button>
+          </div>
+
+          <div style="font-size: 0.72rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.35rem; font-weight: 600;">Estados do Personagem</div>
+          <div class="status-buttons">
+            <button 
+              class="status-btn {piece.dead ? 'active-dead' : ''}" 
+              onclick={() => networkState.updatePieceSheet(piece.id, { dead: !piece.dead })}
+              disabled={!canEditSheet}
+              title={canEditSheet ? "Alternar estado Morto" : "Apenas o controlador ou mestre pode alterar o estado"}
+            >
+              💀 Morto
+            </button>
+            <button 
+              class="status-btn {piece.stunned ? 'active-stunned' : ''}" 
+              onclick={() => networkState.updatePieceSheet(piece.id, { stunned: !piece.stunned })}
+              disabled={!canEditSheet}
+              title={canEditSheet ? "Alternar estado Atordoado" : "Apenas o controlador ou mestre pode alterar o estado"}
+            >
+              💫 Atordoado
             </button>
           </div>
         </section>
@@ -1110,4 +1132,39 @@
     transition: all 0.2s;
   }
   .delete-btn:hover { background: rgba(239, 68, 68, 0.2); color: #fff; }
+
+  /* ── Status States ───────────────────────────────────────────────── */
+  .status-buttons {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.4rem;
+  }
+  .status-btn {
+    flex: 1;
+    padding: 0.5rem;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #94a3b8;
+  }
+  .status-btn.active-dead {
+    background: rgba(239, 68, 68, 0.25);
+    border-color: rgba(239, 68, 68, 0.6);
+    color: #f87171;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.3);
+  }
+  .status-btn.active-stunned {
+    background: rgba(234, 179, 8, 0.25);
+    border-color: rgba(234, 179, 8, 0.6);
+    color: #facc15;
+    box-shadow: 0 0 8px rgba(234, 179, 8, 0.3);
+  }
+  .status-btn:hover:not(.active-dead):not(.active-stunned) {
+    background: rgba(255, 255, 255, 0.08);
+    color: #cbd5e1;
+  }
 </style>

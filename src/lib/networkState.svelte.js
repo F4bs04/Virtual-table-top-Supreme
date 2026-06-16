@@ -31,7 +31,7 @@ export const networkState = $state({
     activeParticles: [], // List of active particle burst events
     pieces: {
       'p-1': { id: 'p-1', name: 'Ichigo Kurosaki', class: 'personagem', x: 2, y: 0, z: 2, color: '#ff3e00', textureUrl: '/soldier.png', hp: 100, maxHp: 100, notes: '', photos: [] },
-      'p-2': { id: 'p-2', name: 'Rukia Kuchiki', class: 'personagem', x: 5, y: 0, z: 3, color: '#00aaff', textureUrl: '/soldier.png', hp: 100, maxHp: 100, notes: '', photos: [] },
+      'p-2': { id: 'p-2', name: 'Rukia Kuchiki', class: 'personagem', x: 5, y: 0, z: 3, color: '#00aaff', textureUrl: '/feiticeiro.png', hp: 100, maxHp: 100, notes: '', photos: [] },
       'o-1': { id: 'o-1', name: 'Senkaimon Gate', class: 'objeto', x: 4, y: 0, z: 5, color: '#ffaa00', textureUrl: '', hp: null, maxHp: null, notes: '', photos: [] },
       'o-2': { id: 'o-2', name: 'Reishi Barrier', class: 'objeto', x: 3, y: 0, z: 3, color: '#888888', textureUrl: '', hp: null, maxHp: null, notes: '', photos: [] }
     }
@@ -166,8 +166,8 @@ export const networkState = $state({
   // Client -> Host message handler
   _handleDataFromClient(conn, data) {
     if (data.type === 'INTENT_UPDATE_SHEET') {
-      // Client can update HP and notes on their own character
-      const { pieceId, hp, notes } = data;
+      // Client can update HP, notes and states on their own character
+      const { pieceId, hp, notes, dead, stunned } = data;
       const piece = networkState.gameState.pieces[pieceId];
       if (!piece || piece.class !== 'personagem') return;
       // Detect HP delta to auto-trigger visual effect
@@ -183,7 +183,9 @@ export const networkState = $state({
         piece.hp = newHp;
       }
       if (typeof notes === 'string') piece.notes = notes;
-      networkState.addLog(`Client ${conn.peer} updated sheet for ${piece.name}`);
+      if (typeof dead === 'boolean') piece.dead = dead;
+      if (typeof stunned === 'boolean') piece.stunned = stunned;
+      networkState.addLog(`Client ${conn.peer} updated sheet/states for ${piece.name}`);
       networkState.broadcastGameState();
       return;
     }
@@ -765,6 +767,8 @@ export const networkState = $state({
       if (typeof updates.maxHp === 'number') piece.maxHp = Math.max(1, updates.maxHp);
       if (typeof updates.notes === 'string') piece.notes = updates.notes;
       if (Array.isArray(updates.photos)) piece.photos = updates.photos;
+      if (typeof updates.dead === 'boolean') piece.dead = updates.dead;
+      if (typeof updates.stunned === 'boolean') piece.stunned = updates.stunned;
       networkState.addLog(`Updated sheet: ${piece.name}`);
       networkState.broadcastGameState();
     } else if (networkState.role === 'client') {
@@ -782,12 +786,16 @@ export const networkState = $state({
         piece.hp = newHp;
       }
       if (typeof updates.notes === 'string') piece.notes = updates.notes;
+      if (typeof updates.dead === 'boolean') piece.dead = updates.dead;
+      if (typeof updates.stunned === 'boolean') piece.stunned = updates.stunned;
       if (networkState.hostConnection && networkState.hostConnection.open) {
         networkState.hostConnection.send({
           type: 'INTENT_UPDATE_SHEET',
           pieceId,
           hp: piece.hp,
-          notes: piece.notes
+          notes: piece.notes,
+          dead: piece.dead,
+          stunned: piece.stunned
         });
       }
     }
