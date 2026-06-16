@@ -1,0 +1,44 @@
+/* Reset defaults for Aethelgard VTT */
+:root {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #07040e;
+  color: #e2e8f0;
+  overflow-y: auto;
+}
+
+#app {
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Custom glowing scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #090514;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2d1d4c;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a855f7;
+  box-shadow: 0 0 10px #a855f7;
+}
+
+input, button {
+  font-family: inherit;
+}
