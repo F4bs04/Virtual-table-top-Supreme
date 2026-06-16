@@ -696,13 +696,10 @@
 <!-- Hover Highlight -->
 {#if hoveredHex}
   {@const hoverPos = hexToWorld(hoveredHex.c, hoveredHex.r)}
+  <!-- Subtle outline ring for hex hover indicator -->
   <T.Mesh position={[hoverPos.x, 0.015, hoverPos.z]} rotation={[-Math.PI / 2, 0, Math.PI / 6]}>
-    <T.RingGeometry args={[0, 1 / Math.sqrt(3), 6]} />
-    <T.MeshBasicMaterial color={gridColor} transparent opacity={0.25} side={THREE.DoubleSide} />
-  </T.Mesh>
-  <T.Mesh position={[hoverPos.x, 0.015, hoverPos.z]} rotation={[-Math.PI / 2, 0, Math.PI / 6]}>
-    <T.RingGeometry args={[1 / Math.sqrt(3) - 0.05, 1 / Math.sqrt(3), 6]} />
-    <T.MeshBasicMaterial color={gridColor} transparent opacity={0.65} side={THREE.DoubleSide} />
+    <T.RingGeometry args={[1 / Math.sqrt(3) - 0.03, 1 / Math.sqrt(3), 6]} />
+    <T.MeshBasicMaterial color={gridColor} transparent opacity={0.75} side={THREE.DoubleSide} />
   </T.Mesh>
 {/if}
 
