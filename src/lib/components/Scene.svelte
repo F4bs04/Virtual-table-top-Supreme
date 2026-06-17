@@ -268,16 +268,6 @@
     return candidates.find(c => c.mesh === hitMesh) || null;
   }
 
-  function canStartRightDrag(piece) {
-    if (!piece) return false;
-
-    const buildMode = networkState.gameState.buildMode;
-    if (piece.class === 'personagem') {
-      return !buildMode && (networkState.role === 'host' || networkState.selectedPieceId === piece.id);
-    }
-
-    return piece.class === 'objeto' && networkState.role === 'host' && buildMode;
-  }
 
   // Sims-style cut-away transparency effect
   useTask(() => {
@@ -634,48 +624,37 @@
       if (e.button === 0) {
         leftClickStartTime = Date.now();
         leftClickStartPos = { x: e.clientX, y: e.clientY };
-      }
-      if (e.button === 2) {
-        rightClickStartTime = Date.now();
-        rightClickStartPos = { x: e.clientX, y: e.clientY };
 
-        const canvas = document.querySelector('canvas');
-        if (canvas && camera.current) {
-          const rect = canvas.getBoundingClientRect();
-          const mouse = new THREE.Vector2(
-            ((e.clientX - rect.left) / rect.width) * 2 - 1,
-            -((e.clientY - rect.top) / rect.height) * 2 + 1
-          );
-
-          raycaster.setFromCamera(mouse, camera.current);
-
-          const candidates = [];
-          scene.traverse((obj) => {
-            if (obj.isMesh) {
-              let node = obj;
-              while (node) {
-                if (node.userData && node.userData.pieceId) {
-                  candidates.push({ mesh: obj, pieceId: node.userData.pieceId, pieceClass: node.userData.pieceClass });
-                  break;
+        // GM left-click on a piece initiates drag
+        if (networkState.role === 'host') {
+          const canvas = document.querySelector('canvas');
+          if (canvas && camera.current) {
+            const mouse = new THREE.Vector2(
+              ((e.clientX - canvas.getBoundingClientRect().left) / canvas.getBoundingClientRect().width) * 2 - 1,
+              -((e.clientY - canvas.getBoundingClientRect().top) / canvas.getBoundingClientRect().height) * 2 + 1
+            );
+            raycaster.setFromCamera(mouse, camera.current);
+            const candidates = [];
+            scene.traverse((obj) => {
+              if (obj.isMesh) {
+                let node = obj;
+                while (node) {
+                  if (node.userData && node.userData.pieceId) {
+                    candidates.push({ mesh: obj, pieceId: node.userData.pieceId, pieceClass: node.userData.pieceClass });
+                    break;
+                  }
+                  node = node.parent;
                 }
-                node = node.parent;
               }
-            }
-          });
-
-          const meshList = candidates.map(c => c.mesh);
-          const intersects = raycaster.intersectObjects(meshList, false);
-
-          if (intersects.length > 0) {
-            const hitMesh = intersects[0].object;
-            const found = candidates.find(c => c.mesh === hitMesh);
-            if (found) {
-              const piece = networkState.gameState.pieces[found.pieceId];
-              const buildMode = networkState.gameState.buildMode;
-              if (networkState.role === 'host' || networkState.selectedPieceId === found.pieceId) {
-                if (found.pieceClass === 'personagem' && buildMode && networkState.role === 'host') {
-                  networkState.addLog(`BLOCKED: Não é possível mover personagens com Build Mode ativo.`);
-                } else {
+            });
+            const meshList = candidates.map(c => c.mesh);
+            const intersects = raycaster.intersectObjects(meshList, false);
+            if (intersects.length > 0) {
+              const hitMesh = intersects[0].object;
+              const found = candidates.find(c => c.mesh === hitMesh);
+              if (found) {
+                const piece = networkState.gameState.pieces[found.pieceId];
+                if (piece) {
                   networkState.draggedPieceId = found.pieceId;
                   networkState.draggedPieceStartHex = { c: piece.x, r: piece.z };
                   dragTargetHex = { c: piece.x, r: piece.z };
@@ -686,6 +665,10 @@
           }
         }
       }
+      if (e.button === 2) {
+        rightClickStartTime = Date.now();
+        rightClickStartPos = { x: e.clientX, y: e.clientY };
+      }
     };
 
     const handleGlobalPointerUp = (e) => {
@@ -695,6 +678,43 @@
       if (e.button === 0) {
         const elapsed = Date.now() - leftClickStartTime;
         const dist = Math.hypot(e.clientX - leftClickStartPos.x, e.clientY - leftClickStartPos.y);
+
+        // GM left-click drag: commit on release (long click or drag)
+        if (networkState.draggedPieceId) {
+          if (elapsed >= 350 || dist >= 15) {
+            const pieceId = networkState.draggedPieceId;
+            const piece = networkState.gameState.pieces[pieceId];
+            const startHex = networkState.draggedPieceStartHex;
+            if (piece && startHex) {
+              const targetC = dragTargetHex?.c ?? piece.x;
+              const targetR = dragTargetHex?.r ?? piece.z;
+              if (piece.class === 'personagem') {
+                piece.x = startHex.c;
+                piece.z = startHex.r;
+              }
+              networkState.requestMove(pieceId, targetC, piece.y, targetR);
+            } else if (piece) {
+              networkState.requestMove(pieceId, piece.x, piece.y, piece.z);
+            }
+            networkState.draggedPieceId = null;
+            networkState.draggedPieceStartHex = null;
+            dragTargetHex = null;
+            networkState.selectedPieceId = null;
+            return;
+          } else {
+            // Short click: cancel drag, keep selection
+            const piece = networkState.gameState.pieces[networkState.draggedPieceId];
+            const startHex = networkState.draggedPieceStartHex;
+            if (piece && startHex && piece.class === 'personagem') {
+              piece.x = startHex.c;
+              piece.z = startHex.r;
+            }
+            networkState.draggedPieceId = null;
+            networkState.draggedPieceStartHex = null;
+            dragTargetHex = null;
+            return;
+          }
+        }
 
         if (elapsed < 350 && dist < 15) {
           if (networkState.activeTool === 'particles') {
@@ -753,7 +773,7 @@
                   networkState.dashMode = false;
                   networkState.selectedPieceId = found.pieceId;
                   if (piece.class === 'personagem') {
-                    networkState.addLog(`Selecionado: ${piece.name}. Clique direito na range vermelha para mover.`);
+                    networkState.addLog(`Selecionado: ${piece.name}. Clique no hex vermelho para mover.`);
                   } else {
                     networkState.addLog(`Selecionado objeto: ${piece.name}.`);
                   }
@@ -777,30 +797,6 @@
               networkState.dashMode = false;
             }
           }
-        }
-      }
-
-      // 2. Right Click: Drag release only (no instant move)
-      if (e.button === 2) {
-        if (networkState.draggedPieceId) {
-          const pieceId = networkState.draggedPieceId;
-          const piece = networkState.gameState.pieces[pieceId];
-          const startHex = networkState.draggedPieceStartHex;
-          if (piece && startHex) {
-            const targetC = dragTargetHex?.c ?? piece.x;
-            const targetR = dragTargetHex?.r ?? piece.z;
-            if (networkState.role !== 'host' || piece.class === 'personagem') {
-              piece.x = startHex.c;
-              piece.z = startHex.r;
-            }
-            networkState.requestMove(pieceId, targetC, piece.y, targetR);
-          } else if (piece) {
-            networkState.requestMove(pieceId, piece.x, piece.y, piece.z);
-          }
-          networkState.draggedPieceId = null;
-          networkState.draggedPieceStartHex = null;
-          dragTargetHex = null;
-          return;
         }
       }
     };
