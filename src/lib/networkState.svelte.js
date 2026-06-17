@@ -388,12 +388,14 @@ export const networkState = $state({
       networkState.addLog(`Host moved ${piece.name} to (${x}, ${y}, ${z})`);
       networkState.broadcastGameState();
     } else if (networkState.role === 'client') {
+      console.log('[DEBUG] requestMove client path', 'pieceId:', pieceId, 'target:', x, y, z, 'hostConnection:', !!networkState.hostConnection, 'open:', networkState.hostConnection?.open);
       if (piece.class === 'objeto') {
         networkState.addLog(`BLOCKED: Clients cannot move object pieces.`);
         return;
       }
       
       const dist = getHexDistance(piece.x, piece.z, x, z);
+      console.log('[DEBUG] requestMove dist:', dist);
       if (dist > 1) {
         networkState.addLog(`BLOCKED: Players can only move 1 space at a time! (Tried: ${dist} spaces)`);
         return;
@@ -407,6 +409,7 @@ export const networkState = $state({
       
       networkState.addLog(`Sending movement intent for ${piece.name} to (${x}, ${y}, ${z})...`);
       if (networkState.hostConnection && networkState.hostConnection.open) {
+        console.log('[DEBUG] requestMove sending INTENT_MOVE...');
         networkState.hostConnection.send({
           type: 'INTENT_MOVE',
           pieceId,
@@ -414,6 +417,8 @@ export const networkState = $state({
           y,
           z
         });
+      } else {
+        console.log('[DEBUG] requestMove FAILED: no hostConnection or not open');
       }
     }
   },

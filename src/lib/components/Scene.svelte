@@ -147,10 +147,21 @@
 
   const selectedPiece = $derived(networkState.selectedPieceId ? networkState.gameState.pieces[networkState.selectedPieceId] : null);
 
+  $effect(() => {
+    if (typeof window !== 'undefined') {
+      console.log('[DEBUG] role:', networkState.role, 'selectedPieceId:', networkState.selectedPieceId, 'selectedPiece:', selectedPiece?.name, 'pieces count:', Object.keys(networkState.gameState.pieces).length);
+    }
+  });
+
   // Hexes reachable for normal move plus dash preview when the character can pay the EP cost.
   const movementHexes = $derived.by(() => {
     if (networkState.drawingMode || networkState.activeTool === 'particles') return [];
-    if (!selectedPiece || selectedPiece.class !== 'personagem') return [];
+    if (!selectedPiece || selectedPiece.class !== 'personagem') {
+      if (typeof window !== 'undefined') {
+        console.log('[DEBUG] movementHexes blocked: selectedPiece=', !!selectedPiece, 'class=', selectedPiece?.class);
+      }
+      return [];
+    }
 
     const dashRange = selectedPiece.dashRange ?? 3;
     const dashEpCost = selectedPiece.dashEpCost ?? 20;
@@ -174,6 +185,9 @@
           }
         }
       }
+    }
+    if (typeof window !== 'undefined') {
+      console.log('[DEBUG] movementHexes count:', hexes.length, 'dashMode:', networkState.dashMode, 'canDash:', (selectedPiece?.ep ?? 0) >= (selectedPiece?.dashEpCost ?? 20));
     }
     return hexes;
   });
@@ -557,7 +571,7 @@
   }
 
   function handleRedHexClick(e, c, r) {
-    e.stopPropagation();
+    e?.stopPropagation();
     if (networkState.selectedPieceId !== null) {
       const p = networkState.gameState.pieces[networkState.selectedPieceId];
       if (p) {
@@ -568,7 +582,7 @@
   }
 
   function handleDashHexClick(e, c, r) {
-    e.stopPropagation();
+    e?.stopPropagation();
     if (networkState.selectedPieceId !== null && networkState.dashMode) {
       networkState.requestDash(networkState.selectedPieceId, c, r);
       networkState.dashMode = false;
@@ -740,45 +754,68 @@
             raycaster.setFromCamera(mouse, camera.current);
 
             const candidates = [];
+            const hexCandidates = [];
             scene.traverse((obj) => {
               if (obj.isMesh) {
                 let node = obj;
                 while (node) {
-                  if (node.userData && node.userData.pieceId) {
-                    candidates.push({ mesh: obj, pieceId: node.userData.pieceId, pieceClass: node.userData.pieceClass });
-                    break;
+                  if (node.userData) {
+                    if (node.userData.pieceId) {
+                      candidates.push({ mesh: obj, pieceId: node.userData.pieceId, pieceClass: node.userData.pieceClass });
+                      break;
+                    }
+                    if (node.userData.isMovementHex) {
+                      hexCandidates.push({ mesh: obj, hexC: node.userData.hexC, hexR: node.userData.hexR, hexIsDash: node.userData.hexIsDash });
+                      break;
+                    }
                   }
                   node = node.parent;
                 }
               }
             });
 
-            const meshList = candidates.map(c => c.mesh);
-            const intersects = raycaster.intersectObjects(meshList, false);
-
-            if (intersects.length > 0) {
-              const hitMesh = intersects[0].object;
-              const found = candidates.find(c => c.mesh === hitMesh);
-              if (found) {
-                const piece = networkState.gameState.pieces[found.pieceId];
-                if (piece) {
-                  if (networkState.role === 'client' && piece.class !== 'personagem') {
-                    return;
+            // Check piece clicks first
+            if (candidates.length > 0) {
+              const meshList = candidates.map(c => c.mesh);
+              const intersects = raycaster.intersectObjects(meshList, false);
+              if (intersects.length > 0) {
+                const hitMesh = intersects[0].object;
+                const found = candidates.find(c => c.mesh === hitMesh);
+                if (found) {
+                  const piece = networkState.gameState.pieces[found.pieceId];
+                  if (piece) {
+                    if (networkState.role === 'client' && piece.class !== 'personagem') {
+                      return;
+                    }
+                    networkState.suppressNextGroundDeselect = false;
+                    if (networkState.role === 'client') {
+                      networkState.activeTool = 'hand';
+                    }
+                    networkState.dashMode = false;
+                    networkState.selectedPieceId = found.pieceId;
+                    if (piece.class === 'personagem') {
+                      networkState.addLog(`Selecionado: ${piece.name}. Clique no hex vermelho para mover.`);
+                    } else {
+                      networkState.addLog(`Selecionado objeto: ${piece.name}.`);
+                    }
                   }
-
-                  networkState.suppressNextGroundDeselect = false;
-                  if (networkState.role === 'client') {
-                    networkState.activeTool = 'hand';
-                  }
-                  networkState.dashMode = false;
-                  networkState.selectedPieceId = found.pieceId;
-                  if (piece.class === 'personagem') {
-                    networkState.addLog(`Selecionado: ${piece.name}. Clique no hex vermelho para mover.`);
-                  } else {
-                    networkState.addLog(`Selecionado objeto: ${piece.name}.`);
-                  }
+                  return;
                 }
-                return;
+              }
+            }
+
+            // Check movement hex clicks
+            if (hexCandidates.length > 0) {
+              const hexMeshList = hexCandidates.map(c => c.mesh);
+              const hexIntersects = raycaster.intersectObjects(hexMeshList, false);
+              if (hexIntersects.length > 0) {
+                const hitHex = hexIntersects[0].object;
+                const foundHex = hexCandidates.find(c => c.mesh === hitHex);
+                if (foundHex) {
+                  console.log('[DEBUG] handleGlobalPointerUp movement hex click:', foundHex.hexC, foundHex.hexR, foundHex.hexIsDash);
+                  handleHexClick(null, foundHex.hexC, foundHex.hexR, foundHex.hexIsDash);
+                  return;
+                }
               }
             }
 
@@ -1022,12 +1059,15 @@
 {#each movementHexes as hex}
   {@const pos = hexToWorld(hex.c, hex.r)}
   {@const pieceY = Math.max(selectedPiece ? (selectedPiece.y || 0) : 0, (networkState.currentViewLevel - 1) * 2.0)}
-  {@const rangeY = pieceY + 0.085}
+  {@const rangeY = pieceY + 0.01}
   {@const hexColor = hex.isDash ? '#06b6d4' : '#ef4444'}
   <!-- Subtle inner fill -->
   <T.Mesh 
     position={[pos.x, rangeY, pos.z]} 
     rotation={[-Math.PI / 2, 0, Math.PI / 6]}
+    frustumCulled={false}
+    renderOrder={999}
+    userData={{ hexC: hex.c, hexR: hex.r, hexIsDash: hex.isDash, isMovementHex: true }}
     onpointerdown={(e) => {
       if (e.button === 0) {
         e.stopPropagation();
@@ -1035,13 +1075,16 @@
       }
     }}
   >
-    <T.RingGeometry args={[0, 1 / Math.sqrt(3) - 0.03, 6]} />
-    <T.MeshBasicMaterial color={hexColor} transparent opacity={hex.isDash ? 0.1 : 0.06} side={THREE.DoubleSide} depthWrite={false} />
+    <T.RingGeometry args={[0, 1 / Math.sqrt(3) - 0.02, 6]} />
+    <T.MeshBasicMaterial color={hexColor} transparent opacity={hex.isDash ? 0.15 : 0.1} side={THREE.DoubleSide} depthWrite={false} />
   </T.Mesh>
   <!-- Thin glowing outer border -->
   <T.Mesh 
     position={[pos.x, rangeY + 0.002, pos.z]} 
     rotation={[-Math.PI / 2, 0, Math.PI / 6]}
+    frustumCulled={false}
+    renderOrder={999}
+    userData={{ hexC: hex.c, hexR: hex.r, hexIsDash: hex.isDash, isMovementHex: true }}
     onpointerdown={(e) => {
       if (e.button === 0) {
         e.stopPropagation();
@@ -1049,8 +1092,8 @@
       }
     }}
   >
-    <T.RingGeometry args={[1 / Math.sqrt(3) - 0.03, 1 / Math.sqrt(3) - 0.005, 6]} />
-    <T.MeshBasicMaterial color={hexColor} transparent opacity={0.7} side={THREE.DoubleSide} depthWrite={false} />
+    <T.RingGeometry args={[1 / Math.sqrt(3) - 0.02, 1 / Math.sqrt(3), 6]} />
+    <T.MeshBasicMaterial color={hexColor} transparent opacity={0.8} side={THREE.DoubleSide} depthWrite={false} />
   </T.Mesh>
 {/each}
 
