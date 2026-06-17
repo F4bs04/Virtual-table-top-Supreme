@@ -26,6 +26,28 @@
     return '#ef4444';
   });
 
+  const epPercent = $derived(
+    piece?.maxEp ? Math.max(0, Math.min(100, ((piece.ep ?? 0) / piece.maxEp) * 100)) : 0
+  );
+
+  function adjustEp(delta) {
+    if (!piece || !canEditSheet) return;
+    const newEp = Math.max(0, Math.min(piece.maxEp ?? 9999, (piece.ep ?? 0) + delta));
+    networkState.updatePieceSheet(piece.id, { ep: newEp });
+  }
+
+  function setEp(val) {
+    if (!piece || !canEditSheet) return;
+    const newEp = Math.max(0, Math.min(piece.maxEp ?? 9999, Number(val) || 0));
+    networkState.updatePieceSheet(piece.id, { ep: newEp });
+  }
+
+  function setMaxEp(val) {
+    if (!piece || !canEdit) return;
+    const newMax = Math.max(1, Number(val) || 1);
+    networkState.updatePieceSheet(piece.id, { maxEp: newMax, ep: Math.min(piece.ep ?? newMax, newMax) });
+  }
+
   // Local notes state (editable, flushed on blur)
   let localNotes = $state('');
   $effect(() => {
@@ -71,18 +93,40 @@
     networkState.updatePieceSheet(piece.id, { notes: localNotes });
   }
 
-  function handlePhotoUpload(e) {
+  async function uploadTextureFromInput(e) {
+    if (!piece || !canEdit) return;
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const dataUrl = await networkState.tokenImageFileToDataUrl(file);
+      if (dataUrl) networkState.updatePieceTexture(piece.id, dataUrl);
+    } catch (err) {
+      console.error('Erro ao carregar imagem do token:', err);
+      networkState.addLog('Erro ao carregar imagem do token. Tente uma imagem menor ou outro formato.');
+    } finally {
+      e.target.value = '';
+    }
+  }
+
+  async function handlePhotoUpload(e) {
     if (!piece || !canEdit) return;
     const files = Array.from(e.target.files);
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const photos = [...(piece.photos ?? []), ev.target.result];
-        networkState.updatePieceSheet(piece.id, { photos });
-      };
-      reader.readAsDataURL(file);
-    });
-    e.target.value = '';
+    try {
+      const uploadedPhotos = [];
+      for (const file of files) {
+        const dataUrl = await networkState.tokenImageFileToDataUrl(file);
+        if (dataUrl) uploadedPhotos.push(dataUrl);
+      }
+      if (uploadedPhotos.length > 0) {
+        networkState.updatePieceSheet(piece.id, { photos: [...(piece.photos ?? []), ...uploadedPhotos] });
+      }
+    } catch (err) {
+      console.error('Erro ao carregar fotos:', err);
+      networkState.addLog('Erro ao carregar fotos. Tente imagens menores ou outro formato.');
+    } finally {
+      e.target.value = '';
+    }
   }
 
   function setMainPhoto(photoUrl) {
@@ -107,7 +151,14 @@
 <!-- Slide-in overlay panel -->
 {#if piece}
   <!-- Sheet Panel -->
-  <aside class="character-sheet" role="complementary" aria-label="Character Sheet">
+  <aside
+    class="character-sheet"
+    role="complementary"
+    aria-label="Character Sheet"
+    onpointerdown={(e) => e.stopPropagation()}
+    onpointerup={(e) => e.stopPropagation()}
+    onclick={(e) => e.stopPropagation()}
+  >
     <!-- Close button -->
     <button class="sheet-close" onclick={close} title="Fechar ficha (ESC)">✕</button>
 
@@ -243,6 +294,122 @@
                 Aplicar
               </button>
             </div>
+          {/if}
+        </section>
+      {/if}
+
+      <!-- ── EP Tracker (only for personagem) ─────────────────── -->
+      {#if piece.class === 'personagem'}
+        <section class="sheet-section">
+          <h3 class="section-label">⚡ Energia (EP)</h3>
+          <div class="hp-bar-track">
+            <div
+              class="hp-bar-fill"
+              style="width: {epPercent}%; background: linear-gradient(90deg, #0ea5e9, #38bdf8);"
+            ></div>
+            <span class="hp-bar-label">{epPercent.toFixed(0)}%</span>
+          </div>
+          <div class="hp-controls">
+            {#if canEditSheet}
+              <button class="hp-btn hp-minus" onclick={() => adjustEp(-5)} title="-5 EP">−5</button>
+              <button class="hp-btn hp-minus" onclick={() => adjustEp(-1)} title="-1 EP">−1</button>
+            {/if}
+            <div class="hp-values">
+              {#if canEditSheet}
+                <input
+                  type="number"
+                  class="hp-input"
+                  value={piece.ep ?? 0}
+                  min="0"
+                  max={piece.maxEp ?? 9999}
+                  oninput={(e) => setEp(e.target.value)}
+                />
+              {:else}
+                <span class="hp-readonly">{piece.ep ?? 0}</span>
+              {/if}
+              <span class="hp-sep">/</span>
+              {#if canEdit}
+                <input
+                  type="number"
+                  class="hp-input hp-max"
+                  value={piece.maxEp ?? 100}
+                  min="1"
+                  oninput={(e) => setMaxEp(e.target.value)}
+                />
+              {:else}
+                <span class="hp-readonly">{piece.maxEp ?? 100}</span>
+              {/if}
+            </div>
+            {#if canEditSheet}
+              <button class="hp-btn hp-plus" onclick={() => adjustEp(1)} title="+1 EP">+1</button>
+              <button class="hp-btn hp-plus" onclick={() => adjustEp(5)} title="+5 EP">+5</button>
+            {/if}
+          </div>
+        </section>
+      {/if}
+
+      <!-- ── Ações de Combate (Dash) ───────────────────────────── -->
+      {#if piece.class === 'personagem'}
+        <section class="sheet-section">
+          <h3 class="section-label">💨 Ações de Combate</h3>
+
+          {#if canEdit}
+            <div style="font-size: 0.72rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; font-weight: 600;">Configurar Dash (GM)</div>
+            <div class="prop-grid" style="margin-bottom: 0.75rem;">
+              <div class="prop-row">
+                <label class="prop-label">Alcance (hex)</label>
+                <div class="prop-input-row">
+                  <input
+                    type="range" min="1" max="10" step="1"
+                    value={piece.dashRange ?? 3}
+                    oninput={(e) => networkState.updatePieceSheet(piece.id, { dashRange: Number(e.target.value) })}
+                    class="prop-slider ep-slider"
+                  />
+                  <span class="prop-val">{piece.dashRange ?? 3}✦</span>
+                </div>
+              </div>
+              <div class="prop-row">
+                <label class="prop-label">Custo EP</label>
+                <div class="prop-input-row">
+                  <input
+                    type="range" min="0" max="100" step="5"
+                    value={piece.dashEpCost ?? 20}
+                    oninput={(e) => networkState.updatePieceSheet(piece.id, { dashEpCost: Number(e.target.value) })}
+                    class="prop-slider ep-slider"
+                  />
+                  <span class="prop-val">{piece.dashEpCost ?? 20}EP</span>
+                </div>
+              </div>
+            </div>
+          {/if}
+
+          <!-- Dash Button — visible to all, enabled only if enough EP -->
+          {#if piece.class === 'personagem'}
+            {@const dashCost = piece.dashEpCost ?? 20}
+            {@const currentEp = piece.ep ?? 0}
+            {@const canDash = currentEp >= dashCost && !networkState.dashMode}
+            <button
+              class="dash-btn {networkState.dashMode && networkState.selectedPieceId === piece.id ? 'dash-active' : ''}"
+              disabled={!canDash && !(networkState.dashMode && networkState.selectedPieceId === piece.id)}
+              onclick={() => {
+                if (networkState.dashMode && networkState.selectedPieceId === piece.id) {
+                  networkState.dashMode = false;
+                } else if (canDash) {
+                  networkState.selectedPieceId = piece.id;
+                  networkState.dashMode = true;
+                }
+              }}
+              title={canDash ? `Dash: move até ${piece.dashRange ?? 3} hexes por ${dashCost} EP` : `EP insuficiente (${currentEp}/${dashCost})`}
+            >
+              {#if networkState.dashMode && networkState.selectedPieceId === piece.id}
+                ❌ Cancelar Dash
+              {:else}
+                💨 Usar Dash ({dashCost} EP)
+              {/if}
+            </button>
+            {#if currentEp < dashCost}
+              <div style="font-size: 0.7rem; color: #64748b; text-align: center; margin-top: 0.35rem;">EP insuficiente ({currentEp}/{dashCost})</div>
+            {/if}
           {/if}
         </section>
       {/if}
@@ -395,14 +562,7 @@
                 <input
                   type="file"
                   accept="image/*"
-                  onchange={(e) => {
-                    const file = e.target.files[0];
-                    if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = (ev) => networkState.updatePieceTexture(piece.id, ev.target.result);
-                    reader.readAsDataURL(file);
-                    e.target.value = '';
-                  }}
+                  onchange={uploadTextureFromInput}
                 />
               </label>
             </div>
@@ -544,14 +704,7 @@
                   <input
                     type="file"
                     accept="image/*"
-                    onchange={(e) => {
-                      const file = e.target.files[0];
-                      if (!file) return;
-                      const reader = new FileReader();
-                      reader.onload = (ev) => networkState.updatePieceTexture(piece.id, ev.target.result);
-                      reader.readAsDataURL(file);
-                      e.target.value = '';
-                    }}
+                    onchange={uploadTextureFromInput}
                   />
                 </label>
               </div>
@@ -601,10 +754,8 @@
                 <label class="prop-label" style="margin: 0; cursor: pointer;">Inverter Imagem</label>
                 <input
                   type="checkbox"
-                  checked={piece.flipX ?? false}
-                  onchange={(e) => {
-                    networkState.updatePieceDetails(piece.id, { flipX: e.target.checked });
-                  }}
+                  checked={!!piece.flipX}
+                  onchange={(e) => networkState.updatePieceDetails(piece.id, { flipX: e.currentTarget.checked })}
                   style="width: 1.2rem; height: 1.2rem; cursor: pointer; accent-color: #a855f7;"
                 />
               </div>
@@ -1177,5 +1328,54 @@
   .status-btn:hover:not(.active-dead):not(.active-stunned) {
     background: rgba(255, 255, 255, 0.08);
     color: #cbd5e1;
+  }
+
+  .dash-btn {
+    width: 100%;
+    padding: 0.6rem 1rem;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: linear-gradient(135deg, rgba(6, 182, 212, 0.15), rgba(56, 189, 248, 0.1));
+    border: 1.5px solid rgba(6, 182, 212, 0.4);
+    color: #38bdf8;
+    letter-spacing: 0.04rem;
+    box-shadow: 0 0 12px rgba(6, 182, 212, 0.15);
+  }
+  .dash-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, rgba(6, 182, 212, 0.3), rgba(56, 189, 248, 0.2));
+    border-color: #06b6d4;
+    color: #fff;
+    box-shadow: 0 0 20px rgba(6, 182, 212, 0.4);
+    transform: translateY(-1px);
+  }
+  .dash-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    transform: none;
+  }
+  .dash-btn.dash-active {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(248, 113, 113, 0.1));
+    border-color: rgba(239, 68, 68, 0.6);
+    color: #f87171;
+    animation: dashPulse 1s ease-in-out infinite;
+    box-shadow: 0 0 16px rgba(239, 68, 68, 0.3);
+  }
+  @keyframes dashPulse {
+    0% { box-shadow: 0 0 8px rgba(6, 182, 212, 0.3); }
+    50% { box-shadow: 0 0 22px rgba(6, 182, 212, 0.7); }
+    100% { box-shadow: 0 0 8px rgba(6, 182, 212, 0.3); }
+  }
+
+  .ep-slider::-webkit-slider-thumb {
+    background: #38bdf8;
+  }
+  .ep-slider::-moz-range-thumb {
+    background: #38bdf8;
+  }
+  .ep-slider::-webkit-slider-runnable-track {
+    background: linear-gradient(90deg, #0ea5e9 var(--val, 50%), rgba(255,255,255,0.1) var(--val, 50%));
   }
 </style>

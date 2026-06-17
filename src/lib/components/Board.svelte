@@ -23,6 +23,8 @@
             networkState.addLog('Draw mode exited (ESC). Camera hand tool active.');
           }
         } else {
+          networkState.dashMode = false;
+          networkState.moveLockPieceId = null;
           networkState.selectedPieceId = null;
           networkState.addLog('Selection cancelled (ESC).');
         }
@@ -37,8 +39,17 @@
         }
       }
     }
+
+    function handleContextMenu(e) {
+      e.preventDefault();
+    }
+
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('contextmenu', handleContextMenu);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('contextmenu', handleContextMenu);
+    };
   });
 
   let showSelectionFeedback = $state(false);

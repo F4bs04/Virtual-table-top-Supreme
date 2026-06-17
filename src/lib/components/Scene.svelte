@@ -143,26 +143,39 @@
 
   // Hover state
   let hoveredHex = $state(null); // { c, r }
+  let dragTargetHex = $state(null); // final hex preview while right-dragging a character
 
   const selectedPiece = $derived(networkState.selectedPieceId ? networkState.gameState.pieces[networkState.selectedPieceId] : null);
+
+  // Hexes reachable for normal move plus dash preview when the character can pay the EP cost.
   const movementHexes = $derived.by(() => {
-    if (networkState.activeTool === 'select') return [];
+    if (networkState.drawingMode || networkState.activeTool === 'particles') return [];
     if (!selectedPiece || selectedPiece.class !== 'personagem') return [];
-    const neighbors = [];
+
+    const dashRange = selectedPiece.dashRange ?? 3;
+    const dashEpCost = selectedPiece.dashEpCost ?? 20;
+    const canDash = (selectedPiece.ep ?? 0) >= dashEpCost;
+    const maxDist = networkState.dashMode ? dashRange : Math.max(1, canDash ? dashRange : 1);
     const cs = selectedPiece.x;
     const rs = selectedPiece.z;
-    for (let dr = -1; dr <= 1; dr++) {
-      for (let dc = -2; dc <= 2; dc++) {
+    const hexes = [];
+
+    for (let dr = -maxDist; dr <= maxDist; dr++) {
+      for (let dc = -(maxDist * 2); dc <= maxDist * 2; dc++) {
         const tc = cs + dc;
         const tr = rs + dr;
         if (tc >= 0 && tc < gridSize && tr >= 0 && tr < gridSize) {
-          if (getHexDistance(cs, rs, tc, tr) === 1) {
-            neighbors.push({ c: tc, r: tr });
+          const d = getHexDistance(cs, rs, tc, tr);
+          if (d >= 1 && d <= maxDist && !networkState.isCellBlocked(tc, tr)) {
+            const isDash = networkState.dashMode || d > 1;
+            if (!isDash || canDash) {
+              hexes.push({ c: tc, r: tr, isDash });
+            }
           }
         }
       }
     }
-    return neighbors;
+    return hexes;
   });
 
   // Background map texture loader
@@ -199,6 +212,72 @@
 
   const { scene, camera } = useThrelte();
   const raycaster = new THREE.Raycaster();
+
+  function getCanvasPointer(e) {
+    const canvas = document.querySelector('canvas');
+    if (!canvas || !camera.current) return null;
+
+    const rect = canvas.getBoundingClientRect();
+    return new THREE.Vector2(
+      ((e.clientX - rect.left) / rect.width) * 2 - 1,
+      -((e.clientY - rect.top) / rect.height) * 2 + 1
+    );
+  }
+
+  function getPointerHex(e) {
+    const pointer = getCanvasPointer(e);
+    if (!pointer) return null;
+
+    raycaster.setFromCamera(pointer, camera.current);
+    const floorY = (networkState.currentViewLevel - 1) * 2.0 + 0.05;
+    const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -floorY);
+    const hitPoint = new THREE.Vector3();
+    if (!raycaster.ray.intersectPlane(groundPlane, hitPoint)) return null;
+
+    const snapped = worldToHex(hitPoint.x, hitPoint.z);
+    return {
+      c: Math.max(0, Math.min(gridSize - 1, snapped.c)),
+      r: Math.max(0, Math.min(gridSize - 1, snapped.r))
+    };
+  }
+
+  function getPieceHit(e) {
+    const pointer = getCanvasPointer(e);
+    if (!pointer) return null;
+
+    raycaster.setFromCamera(pointer, camera.current);
+
+    const candidates = [];
+    scene.traverse((obj) => {
+      if (!obj.isMesh) return;
+
+      let node = obj;
+      while (node) {
+        if (node.userData && node.userData.pieceId) {
+          candidates.push({ mesh: obj, pieceId: node.userData.pieceId, pieceClass: node.userData.pieceClass });
+          break;
+        }
+        node = node.parent;
+      }
+    });
+
+    const intersects = raycaster.intersectObjects(candidates.map(c => c.mesh), false);
+    if (intersects.length === 0) return null;
+
+    const hitMesh = intersects[0].object;
+    return candidates.find(c => c.mesh === hitMesh) || null;
+  }
+
+  function canStartRightDrag(piece) {
+    if (!piece) return false;
+
+    const buildMode = networkState.gameState.buildMode;
+    if (piece.class === 'personagem') {
+      return !buildMode && (networkState.role === 'host' || networkState.selectedPieceId === piece.id);
+    }
+
+    return piece.class === 'objeto' && networkState.role === 'host' && buildMode;
+  }
 
   // Sims-style cut-away transparency effect
   useTask(() => {
@@ -348,7 +427,9 @@
     if (networkState.draggedPieceId) {
       const piece = networkState.gameState.pieces[networkState.draggedPieceId];
       if (piece) {
-        if (piece.structureType === 'wall-line' && piece.x2 !== undefined) {
+        if (networkState.role === 'host' && piece.class === 'personagem') {
+          dragTargetHex = { c, r };
+        } else if (piece.structureType === 'wall-line' && piece.x2 !== undefined) {
           const dx = piece.x2 - piece.x;
           const dz = piece.z2 - piece.z;
           piece.x = c;
@@ -369,12 +450,8 @@
 
   // Handle clicking on the ground grid
   function handleGroundClick(e) {
+    if (e.button !== 0) return; // Only respond to left clicks on ground
     e.stopPropagation();
-
-    if (networkState.activeTool === 'select') {
-      networkState.selectedPieceId = null;
-      return;
-    }
 
     const { x, z } = e.point;
     const snapped = worldToHex(x, z);
@@ -472,26 +549,13 @@
       return;
     }
 
-    if (networkState.selectedPieceId === null) return;
-
-    // Direct movement on red highlighted hexes (adjacent movement range)
-    const isRedHex = movementHexes.some(hex => hex.c === targetX && hex.r === targetZ);
-    if (isRedHex) {
-      networkState.requestMove(networkState.selectedPieceId, targetX, selectedPiece ? (selectedPiece.y || 0) : 0, targetZ);
-      networkState.selectedPieceId = null;
-      return;
+    if (networkState.selectedPieceId !== null) {
+      if (networkState.activeTool === 'hand' || networkState.activeTool === 'select') {
+        // Empty ground click deselects
+        networkState.selectedPieceId = null;
+        networkState.dashMode = false;
+      }
     }
-
-    if (networkState.activeTool !== 'move') {
-      networkState.addLog(`BLOCKED: Select the Move Tool (🎯 Move) in the toolbar to relocate pieces.`);
-      return;
-    }
-
-    // Request the move from network state (Host executes / Client requests)
-    networkState.requestMove(networkState.selectedPieceId, targetX, 0, targetZ);
-
-    // Deselect after moving
-    networkState.selectedPieceId = null;
   }
 
   function handleRedHexClick(e, c, r) {
@@ -505,29 +569,270 @@
     }
   }
 
+  function handleDashHexClick(e, c, r) {
+    e.stopPropagation();
+    if (networkState.selectedPieceId !== null && networkState.dashMode) {
+      networkState.requestDash(networkState.selectedPieceId, c, r);
+      networkState.dashMode = false;
+      networkState.selectedPieceId = null;
+    }
+  }
+
+  function isUiPointerEvent(e) {
+    return !!e.target?.closest?.('.character-sheet, .control-section, .workspace-header, .gm-toolbar, .board-overlay, .floating-roll-banner');
+  }
+
   onMount(() => {
-    const handleGlobalPointerUp = () => {
-      if (networkState.draggedPieceId) {
-        const pieceId = networkState.draggedPieceId;
-        const piece = networkState.gameState.pieces[pieceId];
-        const startHex = networkState.draggedPieceStartHex;
-        if (piece && startHex) {
-          const targetC = piece.x;
-          const targetR = piece.z;
-          // Temporarily restore start position so validation functions evaluate correctly
-          piece.x = startHex.c;
-          piece.z = startHex.r;
-          networkState.requestMove(pieceId, targetC, piece.y, targetR);
-        } else if (piece) {
-          networkState.requestMove(pieceId, piece.x, piece.y, piece.z);
+    let leftClickStartTime = 0;
+    let leftClickStartPos = { x: 0, y: 0 };
+    let rightClickStartTime = 0;
+    let rightClickStartPos = { x: 0, y: 0 };
+
+    const handleGlobalPointerDown = (e) => {
+      if (isUiPointerEvent(e)) return;
+
+      if (e.button === 0) {
+        leftClickStartTime = Date.now();
+        leftClickStartPos = { x: e.clientX, y: e.clientY };
+      }
+      if (e.button === 2) {
+        rightClickStartTime = Date.now();
+        rightClickStartPos = { x: e.clientX, y: e.clientY };
+
+        const canvas = document.querySelector('canvas');
+        if (canvas && camera.current) {
+          const rect = canvas.getBoundingClientRect();
+          const mouse = new THREE.Vector2(
+            ((e.clientX - rect.left) / rect.width) * 2 - 1,
+            -((e.clientY - rect.top) / rect.height) * 2 + 1
+          );
+
+          raycaster.setFromCamera(mouse, camera.current);
+
+          const candidates = [];
+          scene.traverse((obj) => {
+            if (obj.isMesh) {
+              let node = obj;
+              while (node) {
+                if (node.userData && node.userData.pieceId) {
+                  candidates.push({ mesh: obj, pieceId: node.userData.pieceId, pieceClass: node.userData.pieceClass });
+                  break;
+                }
+                node = node.parent;
+              }
+            }
+          });
+
+          const meshList = candidates.map(c => c.mesh);
+          const intersects = raycaster.intersectObjects(meshList, false);
+
+          if (intersects.length > 0) {
+            const hitMesh = intersects[0].object;
+            const found = candidates.find(c => c.mesh === hitMesh);
+            if (found) {
+              const piece = networkState.gameState.pieces[found.pieceId];
+              const buildMode = networkState.gameState.buildMode;
+              if (networkState.role === 'host' || networkState.selectedPieceId === found.pieceId) {
+                if (found.pieceClass === 'personagem' && buildMode && networkState.role === 'host') {
+                  networkState.addLog(`BLOCKED: Não é possível mover personagens com Build Mode ativo.`);
+                } else {
+                  networkState.draggedPieceId = found.pieceId;
+                  networkState.draggedPieceStartHex = { c: piece.x, r: piece.z };
+                  dragTargetHex = { c: piece.x, r: piece.z };
+                  networkState.addLog(`Arrastando ${piece.name}...`);
+                }
+              }
+            }
+          }
         }
-        networkState.draggedPieceId = null;
-        networkState.draggedPieceStartHex = null;
       }
     };
+
+    const handleGlobalPointerUp = (e) => {
+      if (isUiPointerEvent(e)) return;
+
+      // 1. Left Click: Selection
+      if (e.button === 0) {
+        const elapsed = Date.now() - leftClickStartTime;
+        const dist = Math.hypot(e.clientX - leftClickStartPos.x, e.clientY - leftClickStartPos.y);
+
+        if (elapsed < 350 && dist < 15) {
+          const canvas = document.querySelector('canvas');
+          if (canvas && camera.current) {
+            const rect = canvas.getBoundingClientRect();
+            const mouse = new THREE.Vector2(
+              ((e.clientX - rect.left) / rect.width) * 2 - 1,
+              -((e.clientY - rect.top) / rect.height) * 2 + 1
+            );
+
+            raycaster.setFromCamera(mouse, camera.current);
+
+            const candidates = [];
+            scene.traverse((obj) => {
+              if (obj.isMesh) {
+                let node = obj;
+                while (node) {
+                  if (node.userData && node.userData.pieceId) {
+                    candidates.push({ mesh: obj, pieceId: node.userData.pieceId, pieceClass: node.userData.pieceClass });
+                    break;
+                  }
+                  node = node.parent;
+                }
+              }
+            });
+
+            const meshList = candidates.map(c => c.mesh);
+            const intersects = raycaster.intersectObjects(meshList, false);
+
+            if (intersects.length > 0) {
+              const hitMesh = intersects[0].object;
+              const found = candidates.find(c => c.mesh === hitMesh);
+              if (found) {
+                const piece = networkState.gameState.pieces[found.pieceId];
+                if (piece) {
+                  networkState.dashMode = false;
+                  networkState.selectedPieceId = found.pieceId;
+                  if (piece.class === 'personagem') {
+                    networkState.addLog(`Selecionado: ${piece.name}. Clique direito na range vermelha para mover.`);
+                  } else {
+                    networkState.addLog(`Selecionado objeto: ${piece.name}.`);
+                  }
+                }
+                return;
+              }
+            }
+
+            // Clicked empty ground -> deselect
+            if (networkState.activeTool === 'hand' || networkState.activeTool === 'select') {
+              networkState.selectedPieceId = null;
+              networkState.dashMode = false;
+            }
+          }
+        }
+      }
+
+      // 2. Right Click: Move/Drag release
+      if (e.button === 2) {
+        const elapsed = Date.now() - rightClickStartTime;
+        const dist = Math.hypot(e.clientX - rightClickStartPos.x, e.clientY - rightClickStartPos.y);
+
+        if (networkState.draggedPieceId) {
+          const pieceId = networkState.draggedPieceId;
+          const piece = networkState.gameState.pieces[pieceId];
+          const startHex = networkState.draggedPieceStartHex;
+          if (piece && startHex) {
+            const targetC = dragTargetHex?.c ?? piece.x;
+            const targetR = dragTargetHex?.r ?? piece.z;
+            if (networkState.role !== 'host' || piece.class === 'personagem') {
+              piece.x = startHex.c;
+              piece.z = startHex.r;
+            }
+            networkState.requestMove(pieceId, targetC, piece.y, targetR);
+          } else if (piece) {
+            networkState.requestMove(pieceId, piece.x, piece.y, piece.z);
+          }
+          networkState.draggedPieceId = null;
+          networkState.draggedPieceStartHex = null;
+          dragTargetHex = null;
+          return;
+        }
+
+        if (elapsed < 350 && dist < 15 && networkState.selectedPieceId !== null) {
+          const canvas = document.querySelector('canvas');
+          if (canvas && camera.current) {
+            const rect = canvas.getBoundingClientRect();
+            const mouse = new THREE.Vector2(
+              ((e.clientX - rect.left) / rect.width) * 2 - 1,
+              -((e.clientY - rect.top) / rect.height) * 2 + 1
+            );
+
+            raycaster.setFromCamera(mouse, camera.current);
+
+            // Raycast against the invisible ground mesh to snap target coords
+            let groundMesh = null;
+            scene.traverse((obj) => {
+              if (obj.isMesh && obj.geometry && obj.geometry.type === 'PlaneGeometry' && obj.material && obj.material.opacity === 0) {
+                groundMesh = obj;
+              }
+            });
+
+            if (groundMesh) {
+              const intersects = raycaster.intersectObject(groundMesh);
+              if (intersects.length > 0) {
+                const hitPoint = intersects[0].point;
+                const snapped = worldToHex(hitPoint.x, hitPoint.z);
+                let targetX = Math.max(0, Math.min(gridSize - 1, snapped.c));
+                let targetZ = Math.max(0, Math.min(gridSize - 1, snapped.r));
+
+                const pieceId = networkState.selectedPieceId;
+                const selectedPieceObj = networkState.gameState.pieces[pieceId];
+
+                if (selectedPieceObj) {
+                  if (networkState.activeTool === 'move') {
+                    const snappedToWall = networkState.snapToWall(targetX, targetZ);
+                    targetX = snappedToWall.c;
+                    targetZ = snappedToWall.r;
+                  }
+
+                  if (networkState.dashMode) {
+                    const isDashHex = movementHexes.some(hex => hex.c === targetX && hex.r === targetZ && hex.isDash);
+                    if (isDashHex) {
+                      networkState.requestDash(pieceId, targetX, targetZ);
+                      networkState.dashMode = false;
+                      networkState.selectedPieceId = null;
+                    } else {
+                      networkState.selectedPieceId = null;
+                      networkState.dashMode = false;
+                    }
+                  } else {
+                    const isRedHex = movementHexes.some(hex => hex.c === targetX && hex.r === targetZ && !hex.isDash);
+                    if (isRedHex) {
+                      networkState.requestMove(pieceId, targetX, selectedPieceObj.y || 0, targetZ);
+                      networkState.selectedPieceId = null;
+                    } else if (networkState.activeTool === 'move') {
+                      networkState.requestMove(pieceId, targetX, selectedPieceObj.y || 0, targetZ);
+                      networkState.selectedPieceId = null;
+                    } else {
+                      networkState.selectedPieceId = null;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    };
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        // Cancel dash mode
+        if (networkState.dashMode) {
+          networkState.dashMode = false;
+          networkState.addLog('Dash cancelado (ESC).');
+          return;
+        }
+        // Cancel GM move lock
+        if (networkState.moveLockPieceId) {
+          // Restore piece to start hex
+          const piece = networkState.gameState.pieces[networkState.moveLockPieceId];
+          const start = networkState.draggedPieceStartHex;
+          if (piece && start) { piece.x = start.c; piece.z = start.r; }
+          networkState.moveLockPieceId = null;
+          networkState.draggedPieceStartHex = null;
+          dragTargetHex = null;
+          networkState.addLog('Move cancelado (ESC).');
+        }
+      }
+    };
+
+    window.addEventListener('pointerdown', handleGlobalPointerDown);
     window.addEventListener('pointerup', handleGlobalPointerUp);
+    window.addEventListener('keydown', handleKeyDown);
     return () => {
+      window.removeEventListener('pointerdown', handleGlobalPointerDown);
       window.removeEventListener('pointerup', handleGlobalPointerUp);
+      window.removeEventListener('keydown', handleKeyDown);
     };
   });
 </script>
@@ -702,39 +1007,60 @@
 <!-- Hover Highlight: subtle thin glow ring only, no fill -->
 {#if hoveredHex}
   {@const hoverPos = hexToWorld(hoveredHex.c, hoveredHex.r)}
+  {@const hoverY = (networkState.currentViewLevel - 1) * 2.0 + 0.085}
   <!-- Outer thin ring -->
-  <T.Mesh position={[hoverPos.x, 0.018, hoverPos.z]} rotation={[-Math.PI / 2, 0, Math.PI / 6]}>
+  <T.Mesh position={[hoverPos.x, hoverY, hoverPos.z]} rotation={[-Math.PI / 2, 0, Math.PI / 6]}>
     <T.RingGeometry args={[1 / Math.sqrt(3) - 0.06, 1 / Math.sqrt(3) - 0.01, 6]} />
     <T.MeshBasicMaterial color={gridColor} transparent opacity={0.45} side={THREE.DoubleSide} depthWrite={false} />
   </T.Mesh>
   <!-- Inner subtle fill, very low opacity -->
-  <T.Mesh position={[hoverPos.x, 0.016, hoverPos.z]} rotation={[-Math.PI / 2, 0, Math.PI / 6]}>
+  <T.Mesh position={[hoverPos.x, hoverY + 0.001, hoverPos.z]} rotation={[-Math.PI / 2, 0, Math.PI / 6]}>
     <T.RingGeometry args={[0, 1 / Math.sqrt(3) - 0.06, 6]} />
     <T.MeshBasicMaterial color={gridColor} transparent opacity={0.08} side={THREE.DoubleSide} depthWrite={false} />
   </T.Mesh>
 {/if}
 
-<!-- Movement Highlight adjacent red hexes -->
+<!-- Movement Highlight — red for normal move, cyan for dash -->
 {#each movementHexes as hex}
   {@const pos = hexToWorld(hex.c, hex.r)}
-  {@const pieceY = selectedPiece.y || 0}
+  {@const pieceY = Math.max(selectedPiece ? (selectedPiece.y || 0) : 0, (networkState.currentViewLevel - 1) * 2.0)}
+  {@const rangeY = pieceY + 0.085}
+  {@const hexColor = hex.isDash ? '#06b6d4' : '#ef4444'}
+  <!-- Subtle inner fill -->
   <T.Mesh 
-    position={[pos.x, pieceY + 0.012, pos.z]} 
+    position={[pos.x, rangeY, pos.z]} 
     rotation={[-Math.PI / 2, 0, Math.PI / 6]}
-    onpointerdown={(e) => handleRedHexClick(e, hex.c, hex.r)}
-    onclick={(e) => handleRedHexClick(e, hex.c, hex.r)}
+    onpointerdown={(e) => {
+      if (e.button === 2) {
+        e.stopPropagation();
+        if (hex.isDash) {
+          handleDashHexClick(e, hex.c, hex.r);
+        } else {
+          handleRedHexClick(e, hex.c, hex.r);
+        }
+      }
+    }}
   >
-    <T.RingGeometry args={[0, 1 / Math.sqrt(3), 6]} />
-    <T.MeshBasicMaterial color="#ef4444" transparent opacity={0.25} side={THREE.DoubleSide} />
+    <T.RingGeometry args={[0, 1 / Math.sqrt(3) - 0.03, 6]} />
+    <T.MeshBasicMaterial color={hexColor} transparent opacity={hex.isDash ? 0.1 : 0.06} side={THREE.DoubleSide} depthWrite={false} />
   </T.Mesh>
+  <!-- Thin glowing outer border -->
   <T.Mesh 
-    position={[pos.x, pieceY + 0.012, pos.z]} 
+    position={[pos.x, rangeY + 0.002, pos.z]} 
     rotation={[-Math.PI / 2, 0, Math.PI / 6]}
-    onpointerdown={(e) => handleRedHexClick(e, hex.c, hex.r)}
-    onclick={(e) => handleRedHexClick(e, hex.c, hex.r)}
+    onpointerdown={(e) => {
+      if (e.button === 2) {
+        e.stopPropagation();
+        if (hex.isDash) {
+          handleDashHexClick(e, hex.c, hex.r);
+        } else {
+          handleRedHexClick(e, hex.c, hex.r);
+        }
+      }
+    }}
   >
-    <T.RingGeometry args={[1 / Math.sqrt(3) - 0.05, 1 / Math.sqrt(3), 6]} />
-    <T.MeshBasicMaterial color="#ef4444" transparent opacity={0.75} side={THREE.DoubleSide} />
+    <T.RingGeometry args={[1 / Math.sqrt(3) - 0.03, 1 / Math.sqrt(3) - 0.005, 6]} />
+    <T.MeshBasicMaterial color={hexColor} transparent opacity={0.7} side={THREE.DoubleSide} depthWrite={false} />
   </T.Mesh>
 {/each}
 
@@ -854,7 +1180,7 @@
     frustumCulled={false}
   >
     <T.PlaneGeometry args={[basicPlaneWidth, basicPlaneDepth]} />
-    <T.MeshBasicMaterial transparent={true} opacity={0} side={THREE.DoubleSide} />
+    <T.MeshBasicMaterial transparent={true} opacity={0} side={THREE.DoubleSide} depthWrite={false} />
   </T.Mesh>
 {/key}
 

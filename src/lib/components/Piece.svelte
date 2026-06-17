@@ -29,7 +29,7 @@
   let lastTargetY = y;
   let lastTargetZ = z;
   let animProgress = 1.0;
-  const animDuration = 400; // ms
+  const animDuration = 500; // ms (increased from 400ms for more grace)
   let animStartTime = 0;
 
   let activeTexture = $state(null);
@@ -77,61 +77,129 @@
     }
   });
 
+  let dragStartPos = null;
+
   useTask((delta) => {
     if (meshRef && camera.current) {
       meshRef.quaternion.copy(camera.current.quaternion);
     }
 
-    // Detect target changes directly in the frame loop (no Svelte effect dependency issues)
-    if (x !== lastTargetX || y !== lastTargetY || z !== lastTargetZ) {
-      startX = currentX;
-      startY = currentY;
-      startZ = currentZ;
-      lastTargetX = x;
-      lastTargetY = y;
-      lastTargetZ = z;
-      animProgress = 0.0;
-      animStartTime = Date.now();
-    }
+    const isDragging = networkState.draggedPieceId === id;
 
-    if (animProgress < 1.0) {
-      const elapsed = Date.now() - animStartTime;
-      const t = Math.min(1.0, elapsed / animDuration);
-      animProgress = t;
-
-      // Easing function: easeOutQuad
-      const easeT = t * (2 - t);
-
-      currentX = startX + (x - startX) * easeT;
-      currentZ = startZ + (z - startZ) * easeT;
-
-      // Hop height: parabolic arc peaking at t=0.5
-      const hopHeight = 0.8;
-      const hop = Math.sin(t * Math.PI) * hopHeight;
-      currentY = startY + (y - startY) * easeT + hop;
-    } else {
+    if (isDragging) {
+      if (!dragStartPos) {
+        dragStartPos = { x: currentX, y: currentY, z: currentZ };
+      }
+      // Snap immediately during dragging to avoid sluggish hop or lagging behind cursor
       currentX = x;
       currentY = y;
       currentZ = z;
       startX = x;
       startY = y;
       startZ = z;
+      lastTargetX = x;
+      lastTargetY = y;
+      lastTargetZ = z;
+      animProgress = 1.0;
+    } else {
+      if (dragStartPos) {
+        const releasedDragStart = dragStartPos;
+        dragStartPos = null;
+        if (networkState.role === 'host') {
+          // Host drag already moved the token visually; do not replay a second hop on release.
+          currentX = x;
+          currentY = y;
+          currentZ = z;
+          startX = x;
+          startY = y;
+          startZ = z;
+          lastTargetX = x;
+          lastTargetY = y;
+          lastTargetZ = z;
+          animProgress = 1.0;
+        } else {
+          // Client drag waits for the authoritative move confirmation animation.
+          startX = releasedDragStart.x;
+          startY = releasedDragStart.y;
+          startZ = releasedDragStart.z;
+          currentX = releasedDragStart.x;
+          currentY = releasedDragStart.y;
+          currentZ = releasedDragStart.z;
+
+          lastTargetX = x;
+          lastTargetY = y;
+          lastTargetZ = z;
+          animProgress = 0.0;
+          animStartTime = Date.now();
+        }
+      } else if (x !== lastTargetX || y !== lastTargetY || z !== lastTargetZ) {
+        startX = currentX;
+        startY = currentY;
+        startZ = currentZ;
+        lastTargetX = x;
+        lastTargetY = y;
+        lastTargetZ = z;
+        animProgress = 0.0;
+        animStartTime = Date.now();
+      }
+
+      if (animProgress < 1.0) {
+        const elapsed = Date.now() - animStartTime;
+        const t = Math.min(1.0, elapsed / animDuration);
+        animProgress = t;
+
+        // Easing function: easeOutCubic (smoother and premium)
+        const easeT = 1 - Math.pow(1 - t, 3);
+
+        currentX = startX + (x - startX) * easeT;
+        currentZ = startZ + (z - startZ) * easeT;
+
+        // Hop height: parabolic arc — skip for dash animation (teleport)
+        if (animationType === 'dash') {
+          currentY = y; // instant position, no arc
+        } else {
+          const hopHeight = 0.45; // lower jump for visual elegance
+          const hop = Math.sin(t * Math.PI) * hopHeight;
+          currentY = startY + (y - startY) * easeT + hop;
+        }
+      } else {
+        currentX = x;
+        currentY = y;
+        currentZ = z;
+        startX = x;
+        startY = y;
+        startZ = z;
+      }
     }
 
     if (animationType && animationStart > 0) {
       const elapsed = Date.now() - animationStart;
-      const duration = 750;
+      const duration = animationType === 'dash' ? 400 : 750;
+
       if (elapsed >= duration) {
         animationType = null;
         visualY = 0;
         overlayColor = isSelected ? '#ffffff' : '#dddddd';
       } else {
         const t = elapsed / duration;
-        visualY = Math.sin(t * Math.PI) * 0.9;
         if (animationType === 'damage') {
+          visualY = Math.sin(t * Math.PI) * 0.9;
           overlayColor = `rgb(255, ${Math.floor(221 * t + (1 - t) * 40)}, ${Math.floor(221 * t + (1 - t) * 40)})`;
         } else if (animationType === 'heal') {
+          visualY = Math.sin(t * Math.PI) * 0.9;
           overlayColor = `rgb(${Math.floor(221 * t + (1 - t) * 40)}, 255, ${Math.floor(221 * t + (1 - t) * 40)})`;
+        } else if (animationType === 'dash') {
+          // Flash white then fade in — teleport effect, no hop
+          visualY = 0;
+          // Phase 1 (0-0.4): flash bright white, piece fades out
+          // Phase 2 (0.4-1.0): fade back to normal
+          if (t < 0.4) {
+            const flash = 1.0 - t / 0.4; // 1 → 0
+            overlayColor = `rgb(${Math.floor(200 + 55 * flash)}, ${Math.floor(200 + 55 * flash)}, 255)`;
+          } else {
+            const fadeIn = (t - 0.4) / 0.6;
+            overlayColor = `rgb(${Math.floor(221 * fadeIn)}, ${Math.floor(221 * fadeIn)}, ${Math.floor(255 * fadeIn)})`;
+          }
         }
       }
     } else {
@@ -254,53 +322,23 @@
     }
   });
 
+  $effect(() => {
+    if (!activeTexture) return;
+    activeTexture.wrapS = THREE.RepeatWrapping;
+    activeTexture.repeat.x = flipX ? -1 : 1;
+    activeTexture.offset.x = flipX ? 1 : 0;
+    activeTexture.needsUpdate = true;
+  });
+
+
   // Handle Selection click with role-based authority rules
   function handlePointerDown(e) {
-    e.stopPropagation(); // Avoid clicking the ground beneath
-
-    const buildMode = networkState.gameState.buildMode;
-
-    if (networkState.activeTool === 'select') {
-      if (pieceClass === 'personagem' && buildMode) {
-        networkState.addLog(`BLOCKED: Cannot select characters while Build Mode is active.`);
-        return;
-      }
-      if (pieceClass === 'objeto' && !buildMode) {
-        networkState.addLog(`Selected object: ${name}. Enable Build Mode as GM to select.`);
-        return;
-      }
+    if (e.button === 0) {
+      // Left-click selects the token
+      e.stopPropagation();
       networkState.selectedPieceId = id;
-      networkState.addLog(`Selected ${pieceClass === 'personagem' ? 'character' : 'object'}: ${name} (Select Mode).`);
-      return;
-    }
-
-    if (pieceClass === 'personagem') {
-      if (buildMode) {
-        networkState.addLog(`BLOCKED: Cannot select or move characters while Build Mode is active.`);
-        return;
-      }
-      // Rule: Anyone can move character pieces when Build Mode is OFF
-      networkState.selectedPieceId = id;
-      networkState.draggedPieceId = id;
-      networkState.draggedPieceStartHex = { c: hexX, r: hexZ };
-      networkState.addLog(`Selected character: ${name}. Drag to move or adjust height in panel.`);
-    } else if (pieceClass === 'objeto') {
-      if (!buildMode) {
-        networkState.addLog(`Selected object: ${name}. Enable Build Mode as GM to select and move structures.`);
-        return;
-      }
-      networkState.selectedPieceId = id;
-      if (networkState.role === 'host') {
-        if (networkState.activeTool === 'move') {
-          networkState.draggedPieceId = id;
-          networkState.draggedPieceStartHex = { c: hexX, r: hexZ };
-          networkState.addLog(`Selected object: ${name} (Build Mode Active). Drag to move.`);
-        } else {
-          networkState.addLog(`Selected object: ${name}. Select the Move Tool (🎯 Move) in the toolbar to drag.`);
-        }
-      } else {
-        networkState.addLog(`Selected object: ${name}. Only the GM can move structures in Build Mode.`);
-      }
+      networkState.dashMode = false;
+      networkState.addLog(`Selecionado: ${name}. Clique direito na range vermelha para mover.`);
     }
   }
 </script>
@@ -320,7 +358,6 @@
       />
     </T.Mesh>
   {/if}
-
   <!-- Floating Bouncing Selection Arrow -->
   {#if isSelected && pieceClass === 'personagem'}
     <T.Mesh 
@@ -340,11 +377,12 @@
   <T.Group bind:ref={meshRef}>
     {#if activeTexture}
       <T.Mesh 
-        scale={[(isHovered ? 1.4 : 1.2) * scale * (flipX ? -1 : 1), (isHovered ? 1.4 : 1.2) * scale, 1]}
+        scale={[(isHovered ? 1.4 : 1.2) * scale, (isHovered ? 1.4 : 1.2) * scale, 1]}
         position={[0, (0.6 + visualY) * scale, 0]}
         onpointerdown={handlePointerDown}
         onpointerover={() => { isHovered = true; }}
         onpointerout={() => { isHovered = false; }}
+        userData={{ pieceId: id, pieceClass }}
       >
         <T.PlaneGeometry args={[1, 1]} />
         <T.MeshBasicMaterial 

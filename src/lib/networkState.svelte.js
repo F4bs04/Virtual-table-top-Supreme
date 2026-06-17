@@ -19,6 +19,8 @@ export const networkState = $state({
   obstructedStructureIds: new Set(), // Set of structure IDs currently obstructing view of characters
   draggedPieceId: null, // ID of the piece currently being dragged by pointer
   draggedPieceStartHex: null, // { c, r } start hex of the piece before drag for move range validations
+  dashMode: false, // true when the player has activated the dash ability and is picking a destination
+  moveLockPieceId: null, // GM Move tool: piece ID that is "grabbed" and follows the mouse
 
   // Authoritative board state
   gameState: {
@@ -62,10 +64,10 @@ export const networkState = $state({
       }
     },
     pieces: {
-      'p-1': { id: 'p-1', name: 'Ichigo Kurosaki', class: 'personagem', x: 2, y: 0, z: 2, color: '#ff3e00', textureUrl: '/soldier.png', hp: 100, maxHp: 100, notes: 'Ceifador de Almas Substituto', photos: [] },
-      'p-2': { id: 'p-2', name: 'Rukia Kuchiki', class: 'personagem', x: 5, y: 0, z: 3, color: '#00aaff', textureUrl: '/feiticeiro.png', hp: 100, maxHp: 100, notes: 'Tenente da 13ª Divisão', photos: [] },
-      'p-3': { id: 'p-3', name: 'Guarda', class: 'personagem', x: 4, y: 0, z: 1, color: '#10b981', textureUrl: '/guarda.png', hp: 80, maxHp: 80, notes: 'Guarda do Seireitei', photos: [] },
-      'p-4': { id: 'p-4', name: 'Monstro', class: 'personagem', x: 7, y: 0, z: 4, color: '#ef4444', textureUrl: '/monstro.png', hp: 120, maxHp: 120, notes: 'Hollow selvagem', photos: [] },
+      'p-1': { id: 'p-1', name: 'Ichigo Kurosaki', class: 'personagem', x: 2, y: 0, z: 2, color: '#ff3e00', textureUrl: '/soldier.png', hp: 100, maxHp: 100, ep: 100, maxEp: 100, dashRange: 3, dashEpCost: 20, notes: 'Ceifador de Almas Substituto', photos: [] },
+      'p-2': { id: 'p-2', name: 'Rukia Kuchiki', class: 'personagem', x: 5, y: 0, z: 3, color: '#00aaff', textureUrl: '/feiticeiro.png', hp: 100, maxHp: 100, ep: 100, maxEp: 100, dashRange: 3, dashEpCost: 20, notes: 'Tenente da 13ª Divisão', photos: [] },
+      'p-3': { id: 'p-3', name: 'Guarda', class: 'personagem', x: 4, y: 0, z: 1, color: '#10b981', textureUrl: '/guarda.png', hp: 80, maxHp: 80, ep: 80, maxEp: 80, dashRange: 2, dashEpCost: 15, notes: 'Guarda do Seireitei', photos: [] },
+      'p-4': { id: 'p-4', name: 'Monstro', class: 'personagem', x: 7, y: 0, z: 4, color: '#ef4444', textureUrl: '/monstro.png', hp: 120, maxHp: 120, ep: 60, maxEp: 60, dashRange: 4, dashEpCost: 25, notes: 'Hollow selvagem', photos: [] },
       'o-1': { id: 'o-1', name: 'Barril', class: 'objeto', x: 4, y: 0, z: 5, color: '#d97706', textureUrl: '/barril.png', hp: null, maxHp: null, notes: 'Barril de madeira contendo suprimentos', photos: [] },
       'o-2': { id: 'o-2', name: 'Baú', class: 'objeto', x: 3, y: 0, z: 3, color: '#f59e0b', textureUrl: '/bau.png', hp: null, maxHp: null, notes: 'Baú de tesouro trancado', photos: [] }
     }
@@ -200,8 +202,8 @@ export const networkState = $state({
   // Client -> Host message handler
   _handleDataFromClient(conn, data) {
     if (data.type === 'INTENT_UPDATE_SHEET') {
-      // Client can update HP, notes and states on their own character
-      const { pieceId, hp, notes, dead, stunned } = data;
+      // Client can update HP/EP, notes and states on their own character
+      const { pieceId, hp, ep, notes, dead, stunned } = data;
       const piece = networkState.gameState.pieces[pieceId];
       if (!piece || piece.class !== 'personagem') return;
       // Detect HP delta to auto-trigger visual effect
@@ -216,10 +218,43 @@ export const networkState = $state({
         }
         piece.hp = newHp;
       }
+      if (typeof ep === 'number') piece.ep = Math.max(0, Math.min(piece.maxEp ?? ep, ep));
       if (typeof notes === 'string') piece.notes = notes;
       if (typeof dead === 'boolean') piece.dead = dead;
       if (typeof stunned === 'boolean') piece.stunned = stunned;
       networkState.addLog(`Client ${conn.peer} updated sheet/states for ${piece.name}`);
+      networkState.broadcastGameState();
+      return;
+    }
+
+    if (data.type === 'INTENT_DASH') {
+      const { pieceId, x, z } = data;
+      const piece = networkState.gameState.pieces[pieceId];
+      if (!piece || piece.class !== 'personagem') return;
+      const dist = getHexDistance(piece.x, piece.z, x, z);
+      const dashRange = piece.dashRange ?? 3;
+      const dashEpCost = piece.dashEpCost ?? 20;
+      const currentEp = piece.ep ?? 0;
+      if (dist > dashRange) {
+        networkState.addLog(`BLOCKED: Dash range exceeded (${dist}/${dashRange} hexes).`);
+        conn.send({ type: 'STATE_UPDATE', gameState: $state.snapshot(networkState.gameState) });
+        return;
+      }
+      if (currentEp < dashEpCost) {
+        networkState.addLog(`BLOCKED: Not enough EP for dash (${currentEp}/${dashEpCost}).`);
+        conn.send({ type: 'STATE_UPDATE', gameState: $state.snapshot(networkState.gameState) });
+        return;
+      }
+      if (networkState.isCellBlocked(x, z)) {
+        networkState.addLog(`BLOCKED: Dash destination is blocked by a wall.`);
+        conn.send({ type: 'STATE_UPDATE', gameState: $state.snapshot(networkState.gameState) });
+        return;
+      }
+      piece.ep = Math.max(0, currentEp - dashEpCost);
+      piece.x = x;
+      piece.z = z;
+      piece.animationEffect = { type: 'dash', timestamp: Date.now() };
+      networkState.addLog(`${piece.name} usou Dash para (${x}, ${z})! EP restante: ${piece.ep}`);
       networkState.broadcastGameState();
       return;
     }
@@ -336,13 +371,16 @@ export const networkState = $state({
     const buildMode = networkState.gameState.buildMode;
 
     if (networkState.role === 'host') {
-      if (piece.class === 'objeto' && !buildMode) {
-        networkState.addLog(`BLOCKED: Host cannot move object ${piece.name} because Build Mode is OFF.`);
-        return;
-      }
-      if (piece.class === 'personagem' && buildMode) {
-        networkState.addLog(`BLOCKED: Host cannot move character ${piece.name} while Build Mode is active.`);
-        return;
+      const isOverride = (pieceId === networkState.draggedPieceId || pieceId === networkState.moveLockPieceId || networkState.activeTool === 'move');
+      if (!isOverride) {
+        if (piece.class === 'objeto' && !buildMode) {
+          networkState.addLog(`BLOCKED: Host cannot move object ${piece.name} because Build Mode is OFF.`);
+          return;
+        }
+        if (piece.class === 'personagem' && buildMode) {
+          networkState.addLog(`BLOCKED: Host cannot move character ${piece.name} while Build Mode is active.`);
+          return;
+        }
       }
       
       networkState.gameState.pieces[pieceId].x = x;
@@ -408,6 +446,36 @@ export const networkState = $state({
       networkState.addLog(`Updated texture for piece: ${networkState.gameState.pieces[pieceId].name}`);
       networkState.broadcastGameState();
     }
+  },
+
+  async tokenImageFileToDataUrl(file, { maxSize = 768, quality = 0.82 } = {}) {
+    if (!file || !file.type?.startsWith('image/')) return '';
+
+    const originalDataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (event) => resolve(event.target.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+    const image = await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = originalDataUrl;
+    });
+
+    const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
+    const preserveAlpha = file.type === 'image/png' || file.type === 'image/webp';
+    if (scale >= 1 && (preserveAlpha || file.size < 650000)) return originalDataUrl;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(image.width * scale));
+    canvas.height = Math.max(1, Math.round(image.height * scale));
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+    return preserveAlpha ? canvas.toDataURL('image/png') : canvas.toDataURL('image/jpeg', quality);
   },
 
   // Update piece metadata from the inspector panel
@@ -977,6 +1045,10 @@ export const networkState = $state({
         piece.hp = newHp;
       }
       if (typeof updates.maxHp === 'number') piece.maxHp = Math.max(1, updates.maxHp);
+      if (typeof updates.ep === 'number') piece.ep = Math.max(0, Math.min(piece.maxEp ?? 9999, updates.ep));
+      if (typeof updates.maxEp === 'number') piece.maxEp = Math.max(1, updates.maxEp);
+      if (typeof updates.dashRange === 'number') piece.dashRange = Math.max(1, Math.min(10, updates.dashRange));
+      if (typeof updates.dashEpCost === 'number') piece.dashEpCost = Math.max(0, Math.min(200, updates.dashEpCost));
       if (typeof updates.notes === 'string') piece.notes = updates.notes;
       if (Array.isArray(updates.photos)) piece.photos = updates.photos;
       if (typeof updates.dead === 'boolean') piece.dead = updates.dead;
@@ -997,6 +1069,7 @@ export const networkState = $state({
         }
         piece.hp = newHp;
       }
+      if (typeof updates.ep === 'number') piece.ep = Math.max(0, Math.min(piece.maxEp ?? 9999, updates.ep));
       if (typeof updates.notes === 'string') piece.notes = updates.notes;
       if (typeof updates.dead === 'boolean') piece.dead = updates.dead;
       if (typeof updates.stunned === 'boolean') piece.stunned = updates.stunned;
@@ -1005,10 +1078,50 @@ export const networkState = $state({
           type: 'INTENT_UPDATE_SHEET',
           pieceId,
           hp: piece.hp,
+          ep: piece.ep,
           notes: piece.notes,
           dead: piece.dead,
           stunned: piece.stunned
         });
+      }
+    }
+  },
+
+  // Execute a dash move (validates EP cost and range)
+  requestDash(pieceId, targetX, targetZ) {
+    const piece = networkState.gameState.pieces[pieceId];
+    if (!piece || piece.class !== 'personagem') return;
+    const dashRange = piece.dashRange ?? 3;
+    const dashEpCost = piece.dashEpCost ?? 20;
+    const currentEp = piece.ep ?? 0;
+    const dist = getHexDistance(piece.x, piece.z, targetX, targetZ);
+
+    if (dist > dashRange) {
+      networkState.addLog(`BLOCKED: Dash range exceeded (${dist}/${dashRange} hexes).`);
+      return;
+    }
+    if (currentEp < dashEpCost) {
+      networkState.addLog(`BLOCKED: EP insuficiente para Dash (${currentEp}/${dashEpCost}).`);
+      return;
+    }
+
+    if (networkState.role === 'host') {
+      if (networkState.isCellBlocked(targetX, targetZ)) {
+        networkState.addLog(`BLOCKED: Destino do Dash bloqueado por parede.`);
+        return;
+      }
+      piece.ep = Math.max(0, currentEp - dashEpCost);
+      piece.x = targetX;
+      piece.z = targetZ;
+      piece.animationEffect = { type: 'dash', timestamp: Date.now() };
+      networkState.addLog(`${piece.name} usou Dash para (${targetX}, ${targetZ})! EP restante: ${piece.ep}`);
+      networkState.broadcastGameState();
+    } else if (networkState.role === 'client') {
+      // Optimistic local EP deduction
+      piece.ep = Math.max(0, currentEp - dashEpCost);
+      piece.animationEffect = { type: 'dash', timestamp: Date.now() };
+      if (networkState.hostConnection && networkState.hostConnection.open) {
+        networkState.hostConnection.send({ type: 'INTENT_DASH', pieceId, x: targetX, z: targetZ });
       }
     }
   },

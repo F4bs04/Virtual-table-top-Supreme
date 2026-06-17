@@ -91,15 +91,18 @@
   }
 
   // Handle custom piece texture upload
-  function handleTextureUpload(event, pieceId) {
+  async function handleTextureUpload(event, pieceId) {
     const file = event.target.files[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        networkState.updatePieceTexture(pieceId, e.target.result);
-      };
-      reader.readAsDataURL(file);
-      event.target.value = '';
+      try {
+        const dataUrl = await networkState.tokenImageFileToDataUrl(file);
+        if (dataUrl) networkState.updatePieceTexture(pieceId, dataUrl);
+      } catch (err) {
+        console.error('Erro ao carregar imagem do token:', err);
+        networkState.addLog('Erro ao carregar imagem do token. Tente uma imagem menor ou outro formato.');
+      } finally {
+        event.target.value = '';
+      }
     }
   }
 
@@ -640,6 +643,36 @@
                   </div>
                   <div class="piece-actions" style="display: flex; gap: 0.25rem; flex-shrink: 0; margin-left: 0.4rem;">
                     {#if networkState.role === 'host'}
+                      <button
+                        type="button"
+                        class="file-upload-btn"
+                        title="Adicionar imagem"
+                        onclick={(e) => {
+                          e.stopPropagation();
+                          document.getElementById(`texture-upload-${piece.id}`)?.click();
+                        }}
+                        style="margin: 0; padding: 0.15rem 0.35rem; font-size: 0.65rem; line-height: 1.2; cursor: pointer;"
+                      >
+                        Img
+                      </button>
+                      <input
+                        id={`texture-upload-${piece.id}`}
+                        type="file"
+                        accept="image/*"
+                        onchange={(e) => handleTextureUpload(e, piece.id)}
+                        onclick={(e) => e.stopPropagation()}
+                        style="display: none;"
+                      />
+                      {#if piece.textureUrl}
+                        <button
+                          onclick={(e) => { e.stopPropagation(); networkState.updatePieceTexture(piece.id, ''); }}
+                          class="delete-piece-btn"
+                          title="Remover imagem"
+                          style="padding: 0.15rem 0.35rem; font-size: 0.65rem;"
+                        >
+                          Img ✕
+                        </button>
+                      {/if}
                       <button 
                         onclick={(e) => { e.stopPropagation(); networkState.deletePiece(piece.id); }} 
                         class="delete-piece-btn"
