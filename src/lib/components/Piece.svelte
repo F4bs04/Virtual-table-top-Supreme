@@ -105,7 +105,7 @@
       if (dragStartPos) {
         const releasedDragStart = dragStartPos;
         dragStartPos = null;
-        if (networkState.role === 'host') {
+        if (networkState.role === 'host' && pieceClass !== 'personagem') {
           // Host drag already moved the token visually; do not replay a second hop on release.
           currentX = x;
           currentY = y;
@@ -333,7 +333,7 @@
 
   // Handle Selection click with role-based authority rules
   function handlePointerDown(e) {
-    if (e.button === 0) {
+    if (e.button === undefined || e.button === 0) {
       // Left-click selects the token
       e.stopPropagation();
       networkState.selectedPieceId = id;

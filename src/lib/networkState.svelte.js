@@ -270,14 +270,6 @@ export const networkState = $state({
 
       // Role check authority
       if (piece.class === 'personagem') {
-        if (networkState.gameState.buildMode) {
-          networkState.addLog(`BLOCKED: Client ${conn.peer} tried to move character ${piece.name} while Build Mode is active.`);
-          conn.send({
-            type: 'STATE_UPDATE',
-            gameState: $state.snapshot(networkState.gameState)
-          });
-          return;
-        }
         const dist = getHexDistance(piece.x, piece.z, x, z);
         if (dist > 1) {
           networkState.addLog(`BLOCKED: Client ${conn.peer} tried to move ${piece.name} by ${dist} hexes (limit is 1).`);
@@ -391,10 +383,6 @@ export const networkState = $state({
     } else if (networkState.role === 'client') {
       if (piece.class === 'objeto') {
         networkState.addLog(`BLOCKED: Clients cannot move object pieces.`);
-        return;
-      }
-      if (buildMode) {
-        networkState.addLog(`BLOCKED: Cannot move characters while Build Mode is active.`);
         return;
       }
       
