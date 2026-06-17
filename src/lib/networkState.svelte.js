@@ -152,6 +152,9 @@ export const networkState = $state({
     
     networkState.disconnect();
     networkState.role = 'client';
+    networkState.activeTool = 'hand';
+    networkState.drawingMode = false;
+    networkState.drawingStartHex = null;
     networkState.roomId = targetRoomId;
     networkState.error = '';
 

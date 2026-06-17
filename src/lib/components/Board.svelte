@@ -70,6 +70,14 @@
     };
   });
 
+  $effect(() => {
+    if (networkState.role === 'client' && networkState.activeTool !== 'hand') {
+      networkState.activeTool = 'hand';
+      networkState.drawingMode = false;
+      networkState.drawingStartHex = null;
+    }
+  });
+
   // Watch for new rolls to trigger a floating banner
   let lastRollId = $state('');
   let activeRollBanner = $state(null); // { name, die, result }
@@ -665,4 +673,3 @@
     to { transform: translate(-50%, 0); opacity: 1; }
   }
 </style>
-

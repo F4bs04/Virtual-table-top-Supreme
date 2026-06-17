@@ -336,6 +336,9 @@
     if (e.button === undefined || e.button === 0) {
       // Left-click selects the token
       e.stopPropagation();
+      if (networkState.role === 'client') {
+        networkState.activeTool = 'hand';
+      }
       networkState.selectedPieceId = id;
       networkState.suppressNextGroundDeselect = true;
       networkState.dashMode = false;

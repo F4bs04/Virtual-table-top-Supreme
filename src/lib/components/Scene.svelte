@@ -595,7 +595,7 @@
     }
 
     const isMoveHex = movementHexes.some(hex => hex.c === targetX && hex.r === targetZ && !hex.isDash);
-    if (!isMoveHex && networkState.activeTool !== 'move') return false;
+    if (!isMoveHex && !(networkState.role === 'host' && networkState.activeTool === 'move')) return false;
 
     networkState.requestMove(pieceId, targetX, selectedPieceObj.y || 0, targetZ);
     networkState.selectedPieceId = null;
@@ -727,6 +727,9 @@
                 const piece = networkState.gameState.pieces[found.pieceId];
                 if (piece) {
                   networkState.suppressNextGroundDeselect = false;
+                  if (networkState.role === 'client') {
+                    networkState.activeTool = 'hand';
+                  }
                   networkState.dashMode = false;
                   networkState.selectedPieceId = found.pieceId;
                   if (piece.class === 'personagem') {
