@@ -551,7 +551,17 @@
 
     if (networkState.selectedPieceId !== null) {
       if (networkState.activeTool === 'hand' || networkState.activeTool === 'select') {
-        // Empty ground click deselects
+        if (tryMoveSelectedToHex(targetX, targetZ)) return;
+
+        if (networkState.suppressNextGroundDeselect) {
+          networkState.suppressNextGroundDeselect = false;
+          return;
+        }
+
+        if (networkState.role === 'client' && selectedPiece?.class === 'personagem') {
+          return;
+        }
+
         networkState.selectedPieceId = null;
         networkState.dashMode = false;
       }
@@ -726,6 +736,10 @@
               if (found) {
                 const piece = networkState.gameState.pieces[found.pieceId];
                 if (piece) {
+                  if (networkState.role === 'client' && piece.class !== 'personagem') {
+                    return;
+                  }
+
                   networkState.suppressNextGroundDeselect = false;
                   if (networkState.role === 'client') {
                     networkState.activeTool = 'hand';
@@ -749,6 +763,10 @@
 
               if (networkState.suppressNextGroundDeselect) {
                 networkState.suppressNextGroundDeselect = false;
+                return;
+              }
+
+              if (networkState.role === 'client' && selectedPiece?.class === 'personagem') {
                 return;
               }
 
@@ -828,7 +846,7 @@
                       networkState.requestDash(pieceId, targetX, targetZ);
                       networkState.dashMode = false;
                       networkState.selectedPieceId = null;
-                    } else {
+                    } else if (networkState.role !== 'client') {
                       networkState.selectedPieceId = null;
                       networkState.dashMode = false;
                     }
@@ -840,7 +858,7 @@
                     } else if (networkState.activeTool === 'move') {
                       networkState.requestMove(pieceId, targetX, selectedPieceObj.y || 0, targetZ);
                       networkState.selectedPieceId = null;
-                    } else {
+                    } else if (networkState.role !== 'client') {
                       networkState.selectedPieceId = null;
                     }
                   }
