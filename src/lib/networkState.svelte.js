@@ -10,6 +10,7 @@ export const networkState = $state({
   error: '',
   logs: [],
   selectedPieceId: null,
+  suppressNextGroundDeselect: false,
   currentViewLevel: 1, // 1 = Ground Floor, 2 = Second Floor, etc.
   drawingMode: false, // drawing active state for GM
   drawingStartHex: null, // { c, r } start corner of footprint drawing

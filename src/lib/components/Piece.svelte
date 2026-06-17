@@ -337,6 +337,7 @@
       // Left-click selects the token
       e.stopPropagation();
       networkState.selectedPieceId = id;
+      networkState.suppressNextGroundDeselect = true;
       networkState.dashMode = false;
       networkState.addLog(`Selecionado: ${name}. Clique direito na range vermelha para mover.`);
     }

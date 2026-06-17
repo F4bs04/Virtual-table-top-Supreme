@@ -578,6 +578,30 @@
     }
   }
 
+  function tryMoveSelectedToHex(targetX, targetZ) {
+    const pieceId = networkState.selectedPieceId;
+    if (pieceId === null) return false;
+
+    const selectedPieceObj = networkState.gameState.pieces[pieceId];
+    if (!selectedPieceObj) return false;
+
+    if (networkState.dashMode) {
+      const isDashHex = movementHexes.some(hex => hex.c === targetX && hex.r === targetZ && hex.isDash);
+      if (!isDashHex) return false;
+      networkState.requestDash(pieceId, targetX, targetZ);
+      networkState.dashMode = false;
+      networkState.selectedPieceId = null;
+      return true;
+    }
+
+    const isMoveHex = movementHexes.some(hex => hex.c === targetX && hex.r === targetZ && !hex.isDash);
+    if (!isMoveHex && networkState.activeTool !== 'move') return false;
+
+    networkState.requestMove(pieceId, targetX, selectedPieceObj.y || 0, targetZ);
+    networkState.selectedPieceId = null;
+    return true;
+  }
+
   function isUiPointerEvent(e) {
     return !!e.target?.closest?.('.character-sheet, .control-section, .workspace-header, .gm-toolbar, .board-overlay, .floating-roll-banner');
   }
@@ -702,6 +726,7 @@
               if (found) {
                 const piece = networkState.gameState.pieces[found.pieceId];
                 if (piece) {
+                  networkState.suppressNextGroundDeselect = false;
                   networkState.dashMode = false;
                   networkState.selectedPieceId = found.pieceId;
                   if (piece.class === 'personagem') {
@@ -716,6 +741,14 @@
 
             // Clicked empty ground -> deselect
             if (networkState.activeTool === 'hand' || networkState.activeTool === 'select') {
+              const targetHex = getPointerHex(e);
+              if (targetHex && tryMoveSelectedToHex(targetHex.c, targetHex.r)) return;
+
+              if (networkState.suppressNextGroundDeselect) {
+                networkState.suppressNextGroundDeselect = false;
+                return;
+              }
+
               networkState.selectedPieceId = null;
               networkState.dashMode = false;
             }
