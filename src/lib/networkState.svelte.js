@@ -33,6 +33,9 @@ export const networkState = $state({
     basicPlaneSize: 'medium', // 'small' | 'medium' | 'large'
     activePopupImage: '', // Fullscreen shared image URL
     recentRolls: [], // List of recent dice rolls
+    turnOrder: [], // Array of { pieceId, name, textureUrl, color, initiative }
+    currentTurnIndex: 0,
+    turnPhase: 'idle', // 'idle' | 'active'
     activeParticles: [], // List of active particle burst events
     currentEnvironmentId: 'env-1',
     environments: {
@@ -1409,6 +1412,117 @@ export const networkState = $state({
   clearPopupImage() {
     if (networkState.role !== 'host') return;
     networkState.gameState.activePopupImage = '';
+    networkState.broadcastGameState();
+  },
+
+  // ── Turn System ──────────────────────────────────────────────────
+  rollInitiative() {
+    if (networkState.role !== 'host') {
+      networkState.addLog('BLOCKED: Only the Host can roll initiative.');
+      return;
+    }
+
+    const characters = Object.values(networkState.gameState.pieces)
+      .filter(p => p.class === 'personagem');
+
+    if (characters.length === 0) {
+      networkState.addLog('No characters found to roll initiative.');
+      return;
+    }
+
+    const entries = characters.map(p => ({
+      pieceId: p.id,
+      name: p.name,
+      textureUrl: p.textureUrl || '',
+      color: p.color || '#a855f7',
+      initiative: Math.floor(Math.random() * 20) + 1
+    }));
+
+    entries.sort((a, b) => b.initiative - a.initiative || a.name.localeCompare(b.name));
+
+    networkState.gameState.turnOrder = entries;
+    networkState.gameState.currentTurnIndex = 0;
+    networkState.gameState.turnPhase = 'active';
+
+    const logDetails = entries.map((e, i) => `${i + 1}. ${e.name} (${e.initiative})`).join(' | ');
+    networkState.addLog(`Initiative rolled! Order: ${logDetails}`);
+    networkState.addLog(`>> Turn 1: ${entries[0]?.name || '?'}`);
+    networkState.broadcastGameState();
+  },
+
+  nextTurn() {
+    if (networkState.role !== 'host') {
+      networkState.addLog('BLOCKED: Only the Host can advance turns.');
+      return;
+    }
+    const order = networkState.gameState.turnOrder;
+    if (!order || order.length === 0) return;
+
+    const next = (networkState.gameState.currentTurnIndex + 1) % order.length;
+    networkState.gameState.currentTurnIndex = next;
+    networkState.addLog(`>> Turn ${next + 1}: ${order[next]?.name || '?'}`);
+    networkState.broadcastGameState();
+  },
+
+  prevTurn() {
+    if (networkState.role !== 'host') {
+      networkState.addLog('BLOCKED: Only the Host can go back turns.');
+      return;
+    }
+    const order = networkState.gameState.turnOrder;
+    if (!order || order.length === 0) return;
+
+    const prev = (networkState.gameState.currentTurnIndex - 1 + order.length) % order.length;
+    networkState.gameState.currentTurnIndex = prev;
+    networkState.addLog(`<< Turn ${prev + 1}: ${order[prev]?.name || '?'}`);
+    networkState.broadcastGameState();
+  },
+
+  setTurnOrder(newOrder) {
+    if (networkState.role !== 'host') {
+      networkState.addLog('BLOCKED: Only the Host can reorder turns.');
+      return;
+    }
+    if (!Array.isArray(newOrder)) return;
+    networkState.gameState.turnOrder = newOrder;
+    networkState.addLog('Turn order updated by GM.');
+    networkState.broadcastGameState();
+  },
+
+  moveTurnItem(fromIndex, toIndex) {
+    if (networkState.role !== 'host') return;
+    const order = [...networkState.gameState.turnOrder];
+    if (fromIndex < 0 || fromIndex >= order.length) return;
+    if (toIndex < 0 || toIndex >= order.length) return;
+    if (fromIndex === toIndex) return;
+
+    const [item] = order.splice(fromIndex, 1);
+    order.splice(toIndex, 0, item);
+
+    // Adjust currentTurnIndex if needed
+    let cur = networkState.gameState.currentTurnIndex;
+    if (fromIndex === cur) {
+      cur = toIndex;
+    } else {
+      if (fromIndex < cur && toIndex >= cur) cur--;
+      else if (fromIndex > cur && toIndex <= cur) cur++;
+    }
+
+    networkState.gameState.turnOrder = order;
+    networkState.gameState.currentTurnIndex = Math.max(0, Math.min(order.length - 1, cur));
+    networkState.addLog('Turn order reordered by GM.');
+    networkState.broadcastGameState();
+  },
+
+  resetTurns() {
+    if (networkState.role !== 'host') {
+      networkState.addLog('BLOCKED: Only the Host can reset turns.');
+      return;
+    }
+    networkState.gameState.turnOrder = [];
+    networkState.gameState.currentTurnIndex = 0;
+    networkState.gameState.turnPhase = 'idle';
+    networkState.addLog('Turn order cleared.');
     networkState.broadcastGameState();
   },
 

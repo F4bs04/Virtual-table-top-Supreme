@@ -115,7 +115,7 @@
     <div class="board-overlay">
       {#if networkState.selectedPieceId !== null && !networkState.drawingMode && showSelectionFeedback}
         <div class="overlay-badge pulse">
-          PIECE SELECTED // CLICK GROUND TO MOVE
+          PIECE SELECTED // CLICK RED HEX TO MOVE
           <button 
             class="close-overlay-btn" 
             onclick={(e) => { e.stopPropagation(); showInstruction = false; }} 
@@ -127,7 +127,7 @@
           {#if networkState.activeTool === 'hand'}
             LEFT DRAG TO PAN // RIGHT DRAG TO ROTATE // WHEEL TO ZOOM
           {:else if networkState.activeTool === 'move'}
-            SELECT A PIECE // CLICK GROUND TO MOVE IT
+            SELECT A PIECE // CLICK RED HEX TO MOVE
           {:else if networkState.activeTool === 'select'}
             CLICK A PIECE TO SELECT IT // NO MOVEMENT ALLOWED
           {:else if networkState.activeTool === 'particles'}
@@ -334,6 +334,27 @@
           }
         }}>✕ Fechar</button>
         <img src={networkState.gameState.activePopupImage} alt="VTT Shared Image" class="popup-image" />
+      </div>
+    </div>
+  {/if}
+
+  <!-- Floating Turn Indicator -->
+  {#if networkState.gameState.turnPhase === 'active' && networkState.gameState.turnOrder.length > 0}
+    {@const currentEntry = networkState.gameState.turnOrder[networkState.gameState.currentTurnIndex]}
+    <div class="turn-indicator" style="position: absolute; bottom: 1rem; right: 1rem; z-index: 5000; pointer-events: none;">
+      <div style="background: rgba(15, 23, 42, 0.92); border: 1.5px solid #f59e0b; border-radius: 12px; padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.65rem; box-shadow: 0 0 20px rgba(245, 158, 11, 0.3); backdrop-filter: blur(8px);">
+        <span style="font-size: 0.65rem; font-weight: 900; color: #f59e0b; text-transform: uppercase; letter-spacing: 0.05rem; font-family: monospace;">Turno</span>
+        {#if currentEntry.textureUrl}
+          <img src={currentEntry.textureUrl} alt={currentEntry.name} style="width: 32px; height: 32px; border-radius: 8px; object-fit: cover; border: 2px solid #f59e0b;" />
+        {:else}
+          <div style="width: 32px; height: 32px; border-radius: 8px; background: {currentEntry.color}; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 900; color: #fff; border: 2px solid #f59e0b;">
+            {currentEntry.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+          </div>
+        {/if}
+        <div style="display: flex; flex-direction: column;">
+          <strong style="font-size: 0.82rem; color: #fbbf24; line-height: 1.2;">{currentEntry.name}</strong>
+          <span style="font-size: 0.6rem; color: #94a3b8; font-family: monospace;">({networkState.gameState.currentTurnIndex + 1}/{networkState.gameState.turnOrder.length})</span>
+        </div>
       </div>
     </div>
   {/if}

@@ -689,7 +689,7 @@
           </div>
 
         {:else if activeTab === 'dados'}
-          <!-- DADOS & MEDIA TAB -->
+          <!-- DADOS & TURNO TAB -->
           <div class="glass-card fade-in" style="padding: 1rem; display: flex; flex-direction: column; gap: 0.85rem;">
             <h3 class="subsection-title" style="margin: 0; padding-bottom: 0.25rem; color: #a855f7;">🎲 Rolador de Dados</h3>
             <div class="dice-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;">
@@ -702,6 +702,116 @@
                   {die}
                 </button>
               {/each}
+            </div>
+
+            <!-- ── Sistema de Turnos ─────────────────────────────── -->
+            <div class="turn-section" style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 0.85rem; margin-top: 0.25rem;">
+              <h3 class="subsection-title" style="margin: 0 0 0.75rem; color: #f59e0b; display: flex; align-items: center; gap: 0.35rem;">
+                ⚔️ Turnos / Iniciativa
+              </h3>
+
+              {#if networkState.gameState.turnPhase === 'idle'}
+                {#if networkState.role === 'host'}
+                  <button
+                    onclick={() => networkState.rollInitiative()}
+                    class="vtt-btn btn-primary"
+                    style="width: 100%; padding: 0.65rem; font-size: 0.82rem; font-weight: bold; margin-bottom: 0.5rem;"
+                  >
+                    🎲 Rolar Iniciativa para Todos
+                  </button>
+                {:else}
+                  <div style="font-size: 0.78rem; color: #94a3b8; text-align: center; padding: 0.5rem; font-style: italic;">
+                    Aguarde o Mestre rolar a iniciativa...
+                  </div>
+                {/if}
+              {:else}
+                <!-- Turn Order Display -->
+                <div class="turn-order-list" style="display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.75rem;">
+                  {#each networkState.gameState.turnOrder as entry, i}
+                    {@const isCurrentTurn = i === networkState.gameState.currentTurnIndex}
+                    <div
+                      class="turn-entry {isCurrentTurn ? 'current-turn' : ''}"
+                      style="display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.6rem; border-radius: 8px; background: {isCurrentTurn ? 'rgba(245, 158, 11, 0.15)' : 'rgba(0,0,0,0.2)'}; border: 1px solid {isCurrentTurn ? 'rgba(245, 158, 11, 0.4)' : 'transparent'};"
+                    >
+                      <!-- Turn number badge -->
+                      <span class="turn-num" style="font-size: 0.7rem; font-weight: 900; color: {isCurrentTurn ? '#f59e0b' : '#64748b'}; width: 20px; text-align: center; font-family: monospace;">
+                        {i + 1}
+                      </span>
+
+                      <!-- Thumbnail -->
+                      {#if entry.textureUrl}
+                        <img src={entry.textureUrl} alt={entry.name} style="width: 28px; height: 28px; border-radius: 6px; object-fit: cover; border: 2px solid {isCurrentTurn ? '#f59e0b' : 'transparent'};" />
+                      {:else}
+                        <div style="width: 28px; height: 28px; border-radius: 6px; background: {entry.color}; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; font-weight: 900; color: #fff; border: 2px solid {isCurrentTurn ? '#f59e0b' : 'transparent'};">
+                          {entry.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+                        </div>
+                      {/if}
+
+                      <!-- Name -->
+                      <span style="flex: 1; font-size: 0.78rem; font-weight: {isCurrentTurn ? '800' : '500'}; color: {isCurrentTurn ? '#fbbf24' : '#e2e8f0'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        {entry.name}
+                      </span>
+
+                      <!-- Initiative value -->
+                      <span style="font-size: 0.7rem; font-family: monospace; color: {isCurrentTurn ? '#f59e0b' : '#94a3b8'}; font-weight: 700;">
+                        {entry.initiative}
+                      </span>
+
+                      <!-- Current Turn Indicator -->
+                      {#if isCurrentTurn}
+                        <span style="font-size: 0.65rem; color: #f59e0b; font-weight: 900; animation: pulse 1.2s infinite;">👈 ATIVO</span>
+                      {/if}
+
+                      <!-- GM Reorder Controls -->
+                      {#if networkState.role === 'host'}
+                        <div class="reorder-btns" style="display: flex; gap: 0.2rem; flex-shrink: 0;">
+                          {#if i > 0}
+                            <button
+                              onclick={() => networkState.moveTurnItem(i, i - 1)}
+                              style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.6rem; cursor: pointer; line-height: 1;"
+                              title="Mover para cima"
+                            >▲</button>
+                          {/if}
+                          {#if i < networkState.gameState.turnOrder.length - 1}
+                            <button
+                              onclick={() => networkState.moveTurnItem(i, i + 1)}
+                              style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.6rem; cursor: pointer; line-height: 1;"
+                              title="Mover para baixo"
+                            >▼</button>
+                          {/if}
+                        </div>
+                      {/if}
+                    </div>
+                  {/each}
+                </div>
+
+                <!-- Turn Controls (GM only) -->
+                {#if networkState.role === 'host'}
+                  <div class="turn-controls" style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+                    <button
+                      onclick={() => networkState.prevTurn()}
+                      class="vtt-btn"
+                      style="flex: 1; padding: 0.5rem; font-size: 0.75rem; font-weight: bold; background: rgba(100, 116, 139, 0.2); border: 1px solid rgba(100, 116, 139, 0.3); color: #cbd5e1; cursor: pointer; border-radius: 6px;"
+                    >
+                      ◀ Anterior
+                    </button>
+                    <button
+                      onclick={() => networkState.nextTurn()}
+                      class="vtt-btn btn-primary"
+                      style="flex: 1; padding: 0.5rem; font-size: 0.75rem; font-weight: bold;"
+                    >
+                      Próximo ▶
+                    </button>
+                  </div>
+                  <button
+                    onclick={() => networkState.resetTurns()}
+                    class="vtt-btn btn-danger"
+                    style="width: 100%; padding: 0.4rem; font-size: 0.72rem; font-weight: bold;"
+                  >
+                    🗑 Limpar Turnos
+                  </button>
+                {/if}
+              {/if}
             </div>
 
             <!-- GM Image Sharing Section -->

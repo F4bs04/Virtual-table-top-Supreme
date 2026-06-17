@@ -551,8 +551,6 @@
 
     if (networkState.selectedPieceId !== null) {
       if (networkState.activeTool === 'hand' || networkState.activeTool === 'select') {
-        if (tryMoveSelectedToHex(targetX, targetZ)) return;
-
         if (networkState.suppressNextGroundDeselect) {
           networkState.suppressNextGroundDeselect = false;
           return;
@@ -585,6 +583,14 @@
       networkState.requestDash(networkState.selectedPieceId, c, r);
       networkState.dashMode = false;
       networkState.selectedPieceId = null;
+    }
+  }
+
+  function handleHexClick(e, c, r, isDash) {
+    if (isDash) {
+      handleDashHexClick(e, c, r);
+    } else {
+      handleRedHexClick(e, c, r);
     }
   }
 
@@ -758,9 +764,6 @@
 
             // Clicked empty ground -> deselect
             if (networkState.activeTool === 'hand' || networkState.activeTool === 'select') {
-              const targetHex = getPointerHex(e);
-              if (targetHex && tryMoveSelectedToHex(targetHex.c, targetHex.r)) return;
-
               if (networkState.suppressNextGroundDeselect) {
                 networkState.suppressNextGroundDeselect = false;
                 return;
@@ -777,11 +780,8 @@
         }
       }
 
-      // 2. Right Click: Move/Drag release
+      // 2. Right Click: Drag release only (no instant move)
       if (e.button === 2) {
-        const elapsed = Date.now() - rightClickStartTime;
-        const dist = Math.hypot(e.clientX - rightClickStartPos.x, e.clientY - rightClickStartPos.y);
-
         if (networkState.draggedPieceId) {
           const pieceId = networkState.draggedPieceId;
           const piece = networkState.gameState.pieces[pieceId];
@@ -801,71 +801,6 @@
           networkState.draggedPieceStartHex = null;
           dragTargetHex = null;
           return;
-        }
-
-        if (elapsed < 350 && dist < 15 && networkState.selectedPieceId !== null) {
-          const canvas = document.querySelector('canvas');
-          if (canvas && camera.current) {
-            const rect = canvas.getBoundingClientRect();
-            const mouse = new THREE.Vector2(
-              ((e.clientX - rect.left) / rect.width) * 2 - 1,
-              -((e.clientY - rect.top) / rect.height) * 2 + 1
-            );
-
-            raycaster.setFromCamera(mouse, camera.current);
-
-            // Raycast against the invisible ground mesh to snap target coords
-            let groundMesh = null;
-            scene.traverse((obj) => {
-              if (obj.isMesh && obj.geometry && obj.geometry.type === 'PlaneGeometry' && obj.material && obj.material.opacity === 0) {
-                groundMesh = obj;
-              }
-            });
-
-            if (groundMesh) {
-              const intersects = raycaster.intersectObject(groundMesh);
-              if (intersects.length > 0) {
-                const hitPoint = intersects[0].point;
-                const snapped = worldToHex(hitPoint.x, hitPoint.z);
-                let targetX = Math.max(0, Math.min(gridSize - 1, snapped.c));
-                let targetZ = Math.max(0, Math.min(gridSize - 1, snapped.r));
-
-                const pieceId = networkState.selectedPieceId;
-                const selectedPieceObj = networkState.gameState.pieces[pieceId];
-
-                if (selectedPieceObj) {
-                  if (networkState.activeTool === 'move') {
-                    const snappedToWall = networkState.snapToWall(targetX, targetZ);
-                    targetX = snappedToWall.c;
-                    targetZ = snappedToWall.r;
-                  }
-
-                  if (networkState.dashMode) {
-                    const isDashHex = movementHexes.some(hex => hex.c === targetX && hex.r === targetZ && hex.isDash);
-                    if (isDashHex) {
-                      networkState.requestDash(pieceId, targetX, targetZ);
-                      networkState.dashMode = false;
-                      networkState.selectedPieceId = null;
-                    } else if (networkState.role !== 'client') {
-                      networkState.selectedPieceId = null;
-                      networkState.dashMode = false;
-                    }
-                  } else {
-                    const isRedHex = movementHexes.some(hex => hex.c === targetX && hex.r === targetZ && !hex.isDash);
-                    if (isRedHex) {
-                      networkState.requestMove(pieceId, targetX, selectedPieceObj.y || 0, targetZ);
-                      networkState.selectedPieceId = null;
-                    } else if (networkState.activeTool === 'move') {
-                      networkState.requestMove(pieceId, targetX, selectedPieceObj.y || 0, targetZ);
-                      networkState.selectedPieceId = null;
-                    } else if (networkState.role !== 'client') {
-                      networkState.selectedPieceId = null;
-                    }
-                  }
-                }
-              }
-            }
-          }
         }
       }
     };
@@ -1098,13 +1033,9 @@
     position={[pos.x, rangeY, pos.z]} 
     rotation={[-Math.PI / 2, 0, Math.PI / 6]}
     onpointerdown={(e) => {
-      if (e.button === 2) {
+      if (e.button === 0) {
         e.stopPropagation();
-        if (hex.isDash) {
-          handleDashHexClick(e, hex.c, hex.r);
-        } else {
-          handleRedHexClick(e, hex.c, hex.r);
-        }
+        handleHexClick(e, hex.c, hex.r, hex.isDash);
       }
     }}
   >
@@ -1116,13 +1047,9 @@
     position={[pos.x, rangeY + 0.002, pos.z]} 
     rotation={[-Math.PI / 2, 0, Math.PI / 6]}
     onpointerdown={(e) => {
-      if (e.button === 2) {
+      if (e.button === 0) {
         e.stopPropagation();
-        if (hex.isDash) {
-          handleDashHexClick(e, hex.c, hex.r);
-        } else {
-          handleRedHexClick(e, hex.c, hex.r);
-        }
+        handleHexClick(e, hex.c, hex.r, hex.isDash);
       }
     }}
   >

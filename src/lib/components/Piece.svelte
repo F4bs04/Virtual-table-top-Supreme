@@ -342,7 +342,7 @@
       networkState.selectedPieceId = id;
       networkState.suppressNextGroundDeselect = true;
       networkState.dashMode = false;
-      networkState.addLog(`Selecionado: ${name}. Clique direito na range vermelha para mover.`);
+      networkState.addLog(`Selecionado: ${name}. Clique no hex vermelho para mover.`);
     }
   }
 </script>
