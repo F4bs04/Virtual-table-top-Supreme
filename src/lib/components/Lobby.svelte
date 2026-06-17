@@ -30,15 +30,6 @@
     return networkState.getHouseContainingPiece(selectedPiece.id);
   });
 
-  const structurePresets = [
-    { name: 'Reishi Wall', color: '#64748b', description: 'Bloqueio e cobertura' },
-    { name: 'Senkaimon Gate', color: '#f59e0b', description: 'Portal / entrada' },
-    { name: 'Barrier Node', color: '#06b6d4', description: 'Defesa espiritual' },
-    { name: 'Training Platform', color: '#a855f7', description: 'Elevação / arena' },
-    { name: 'Supply Shrine', color: '#22c55e', description: 'Objetivo / recurso' },
-    { name: 'Hazard Zone', color: '#ef4444', description: 'Perigo de cenário' }
-  ];
-
   $effect(() => {
     if (!selectedPiece) return;
     inspectorName = selectedPiece.name;
@@ -50,10 +41,6 @@
     if (!newPieceName.trim()) return;
     networkState.addPiece(newPieceName.trim(), newPieceClass, newPieceColor);
     newPieceName = '';
-  }
-
-  function addStructure(preset) {
-    networkState.addStructure(preset.name, preset.color);
   }
 
   function buildHouse() {
@@ -88,6 +75,26 @@
       showCopied = true;
       setTimeout(() => { showCopied = false; }, 2000);
     });
+  }
+
+  // 3D Shape creator state
+  let shapeColor = $state('#64748b');
+  let shapeSize = $state(1);
+
+  function createShape(shapeType) {
+    const names = {
+      box: 'Box', cylinder: 'Cylinder', sphere: 'Sphere',
+      'castle-wall': 'Castle Wall', pyramid: 'Pyramid'
+    };
+    networkState.add3DShape(names[shapeType] || shapeType, shapeType, shapeColor, shapeSize);
+  }
+
+  async function handleModelImport(event) {
+    const file = event.target.files[0];
+    if (file) {
+      await networkState.importModel(file);
+      event.target.value = '';
+    }
   }
 
   // Handle custom piece texture upload
@@ -319,72 +326,79 @@
                 </div>
               {/if}
 
-              <div class="structure-palette">
-                <h4 class="mini-title">Construction Assets:</h4>
-                <div class="structure-grid">
-                  {#each structurePresets as preset}
-                    <button
-                      class="structure-card"
-                      disabled={!networkState.gameState.buildMode}
-                      onclick={() => addStructure(preset)}
-                      title={networkState.gameState.buildMode ? `Place ${preset.name}` : 'Enable Build Mode first'}
-                    >
-                      <span class="structure-swatch" style="background: {preset.color}"></span>
-                      <strong>{preset.name}</strong>
-                    </button>
-                  {/each}
-                </div>
-              </div>
-
-              <div class="house-builder" style="border-color: rgba(168, 85, 247, 0.4);">
-                <h4 class="mini-title" style="color: #c084fc; margin-top: 0; margin-bottom: 0.5rem;">SketchUp Footprint Drawing:</h4>
-                <div style="display: flex; flex-direction: column; gap: 0.75rem; background: rgba(0, 0, 0, 0.25); padding: 0.75rem; border-radius: 8px;">
-                  <div class="control-row" style="margin: 0; display: flex; align-items: center; justify-content: space-between;">
-                    <span class="control-label" style="font-size: 0.8rem;">Structure Type:</span>
-                    <select class="vtt-select" style="padding: 0.35rem 0.55rem; font-size: 0.8rem;"
-                      value={networkState.drawingStructureType || 'house'}
-                      onchange={(e) => {
-                        networkState.drawingStructureType = e.target.value;
-                        if (e.target.value === 'wall-line' || e.target.value === 'stair') {
-                          networkState.activeTool = 'draw-wall';
-                        } else if (e.target.value === 'floor-plane') {
-                          networkState.activeTool = 'draw-floor';
-                        } else {
-                          networkState.activeTool = 'draw-wall';
-                        }
-                        networkState.drawingMode = true;
-                      }}
-                    >
-                      <option value="wall-line">Wall Line (Parede)</option>
-                      <option value="stair">Stairs (Escada)</option>
-                      <option value="house">Extruded Block (Bloco 3D)</option>
-                      <option value="floor-plane">Floor Platform (Placa Piso)</option>
-                    </select>
-                  </div>
-                  <button 
-                    class="vtt-btn {networkState.drawingMode ? 'btn-secondary' : 'btn-primary'}" 
-                    style="padding: 0.5rem 1rem; font-size: 0.8rem; width: 100%;"
-                    onclick={() => {
-                      networkState.drawingMode = !networkState.drawingMode;
-                      networkState.drawingStartHex = null;
-                      if (networkState.drawingMode) {
-                        networkState.addLog("Drawing mode active. Click start hex, move cursor, then click end hex.");
-                      }
-                    }}
+              <div class="shape-palette">
+                <h4 class="mini-title">3D Shapes:</h4>
+                <div class="shape-grid">
+                  <button
+                    class="shape-card"
+                    disabled={!networkState.gameState.buildMode}
+                    onclick={() => createShape('box')}
+                    title="Criar um cubo"
                   >
-                    {networkState.drawingMode ? '✕ Cancel Drawing' : '✏️ Draw Footprint'}
+                    <span class="shape-icon">▣</span>
+                    <strong>Box</strong>
                   </button>
-                  <p class="help-text" style="font-size: 0.75rem; margin: 0; color: #94a3b8; line-height: 1.3;">
-                    {#if networkState.drawingMode}
-                      {#if networkState.drawingStartHex === null}
-                        <strong>Step 1</strong>: Click a grid cell to set the first corner.
-                      {:else}
-                        <strong>Step 2</strong>: Hover and click another cell to set the second corner.
-                      {/if}
-                    {:else}
-                      Activate and draw a rectangle footprint on the grid, then extrude in the Inspector.
-                    {/if}
-                  </p>
+                  <button
+                    class="shape-card"
+                    disabled={!networkState.gameState.buildMode}
+                    onclick={() => createShape('cylinder')}
+                    title="Criar um cilindro"
+                  >
+                    <span class="shape-icon">⬤</span>
+                    <strong>Cilindro</strong>
+                  </button>
+                  <button
+                    class="shape-card"
+                    disabled={!networkState.gameState.buildMode}
+                    onclick={() => createShape('sphere')}
+                    title="Criar uma esfera"
+                  >
+                    <span class="shape-icon">◉</span>
+                    <strong>Esfera</strong>
+                  </button>
+                  <button
+                    class="shape-card"
+                    disabled={!networkState.gameState.buildMode}
+                    onclick={() => createShape('pyramid')}
+                    title="Criar uma pirâmide"
+                  >
+                    <span class="shape-icon">△</span>
+                    <strong>Pirâmide</strong>
+                  </button>
+                  <button
+                    class="shape-card"
+                    disabled={!networkState.gameState.buildMode}
+                    onclick={() => createShape('castle-wall')}
+                    title="Criar um muro de castelo com ameias"
+                  >
+                    <span class="shape-icon">▤</span>
+                    <strong>Muro</strong>
+                  </button>
+                  <label
+                    class="shape-card import-card"
+                    disabled={!networkState.gameState.buildMode}
+                    style="cursor: pointer;"
+                    title="Importar modelo 3D (.glb)"
+                  >
+                    <span class="shape-icon">📦</span>
+                    <strong>Importar 3D</strong>
+                    <input
+                      type="file"
+                      accept=".glb,.gltf"
+                      onchange={handleModelImport}
+                      style="display: none;"
+                    />
+                  </label>
+                </div>
+                <div class="shape-options" style="margin-top: 0.5rem; display: flex; gap: 0.5rem; align-items: center;">
+                  <span class="control-label" style="font-size: 0.78rem;">Cor:</span>
+                  <input type="color" bind:value={shapeColor} class="vtt-color-picker" />
+                  <span class="control-label" style="font-size: 0.78rem; margin-left: 0.5rem;">Tam:</span>
+                  <select bind:value={shapeSize} class="vtt-select" style="flex: 1; padding: 0.3rem; font-size: 0.78rem;">
+                    <option value={0.5}>Pequeno (0.5)</option>
+                    <option value={1}>Médio (1)</option>
+                    <option value={2}>Grande (2)</option>
+                  </select>
                 </div>
               </div>
 
@@ -1326,7 +1340,7 @@
     text-transform: uppercase;
   }
 
-  .structure-palette {
+  .shape-palette {
     background: rgba(0, 0, 0, 0.18);
     padding: 1rem;
     border-radius: 8px;
@@ -1334,94 +1348,57 @@
     margin-bottom: 1.25rem;
   }
 
-  .structure-grid {
+  .shape-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.6rem;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
   }
 
-  .structure-card {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 0.15rem 0.5rem;
+  .shape-card {
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    text-align: left;
+    justify-content: center;
+    gap: 0.3rem;
+    text-align: center;
     background: rgba(15, 23, 42, 0.76);
     color: #e2e8f0;
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 8px;
-    padding: 0.65rem;
+    padding: 0.6rem 0.4rem;
     cursor: pointer;
     transition: border-color 0.2s, transform 0.2s, opacity 0.2s;
+    min-height: 70px;
   }
 
-  .structure-card:hover:not(:disabled) {
+  .shape-card:hover:not(:disabled) {
     transform: translateY(-1px);
     border-color: rgba(6, 182, 212, 0.45);
   }
 
-  .structure-card:disabled {
+  .shape-card:disabled {
     cursor: not-allowed;
     opacity: 0.45;
   }
 
-  .structure-card strong {
-    font-size: 0.78rem;
-  }
-
-  .structure-card small {
-    grid-column: 2;
-    color: #94a3b8;
-    font-size: 0.68rem;
-  }
-
-  .structure-swatch {
-    grid-row: span 2;
-    width: 14px;
-    height: 32px;
-    border-radius: 999px;
-    box-shadow: 0 0 10px currentColor;
-  }
-
-  .house-builder {
-    background: rgba(15, 23, 42, 0.72);
-    padding: 1rem;
-    border-radius: 10px;
-    border: 1px solid rgba(34, 211, 238, 0.16);
-    margin-bottom: 1.25rem;
-  }
-
-  .house-builder-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.65rem;
-    margin-bottom: 0.85rem;
-  }
-
-  .builder-field {
-    display: grid;
-    gap: 0.3rem;
-    color: #94a3b8;
+  .shape-card strong {
     font-size: 0.72rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.04rem;
   }
 
-  .builder-field.wide {
-    grid-column: 1 / -1;
+  .shape-icon {
+    font-size: 1.5rem;
+    line-height: 1;
   }
 
-  .btn-build-house {
-    width: 100%;
-    background: linear-gradient(135deg, #22d3ee 0%, #a855f7 100%);
-    color: #020617;
-    margin-bottom: 0.65rem;
+  .import-card:hover {
+    border-color: rgba(34, 197, 94, 0.45) !important;
   }
 
-  .btn-build-house:disabled {
-    cursor: not-allowed;
-    opacity: 0.45;
+  .shape-options {
+    margin-top: 0.5rem;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
   }
 
   /* Theme selection & styling */

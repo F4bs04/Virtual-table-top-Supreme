@@ -526,6 +526,45 @@
               </div>
             {/if}
 
+            {#if piece.structureType === '3d-shape'}
+              <div class="prop-row">
+                <label class="prop-label">Largura (X)</label>
+                <div class="prop-input-row">
+                  <input
+                    type="range" min="0.5" max="24" step="0.5"
+                    value={piece.width ?? 2}
+                    oninput={(e) => updateStructureProp('width', e.target.value)}
+                    class="prop-slider"
+                  />
+                  <span class="prop-val">{(piece.width ?? 2).toFixed(1)}</span>
+                </div>
+              </div>
+              <div class="prop-row">
+                <label class="prop-label">Profundidade (Z)</label>
+                <div class="prop-input-row">
+                  <input
+                    type="range" min="0.5" max="24" step="0.5"
+                    value={piece.depth ?? 2}
+                    oninput={(e) => updateStructureProp('depth', e.target.value)}
+                    class="prop-slider"
+                  />
+                  <span class="prop-val">{(piece.depth ?? 2).toFixed(1)}</span>
+                </div>
+              </div>
+              <div class="prop-row">
+                <label class="prop-label">Altura (Y)</label>
+                <div class="prop-input-row">
+                  <input
+                    type="range" min="0.1" max="15" step="0.1"
+                    value={piece.height ?? 2}
+                    oninput={(e) => updateStructureProp('height', e.target.value)}
+                    class="prop-slider"
+                  />
+                  <span class="prop-val">{(piece.height ?? 2).toFixed(1)}</span>
+                </div>
+              </div>
+            {/if}
+
             <div class="prop-row">
               <label class="prop-label">Andar</label>
               <select

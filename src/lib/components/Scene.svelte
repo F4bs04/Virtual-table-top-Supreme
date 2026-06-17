@@ -13,6 +13,7 @@
   import Window from './Window.svelte';
   import Stair from './Stair.svelte';
   import SplatBackground from './SplatBackground.svelte';
+  import Shape3D from './Shape3D.svelte';
   import * as THREE from 'three';
 
   // Initialize Threlte interactivity plugin inside Canvas hierarchy
@@ -1305,6 +1306,20 @@
       color={piece.color}
       textureUrl={piece.textureUrl}
       points={piece.points}
+    />
+  {:else if piece.structureType === '3d-shape'}
+    <Shape3D
+      id={piece.id}
+      x={worldPos.x}
+      y={networkState.getPieceRenderHeight(piece)}
+      z={worldPos.z}
+      color={piece.color}
+      width={piece.width}
+      depth={piece.depth}
+      height={piece.height}
+      shapeType={piece.shapeType || 'box'}
+      modelUrl={piece.modelUrl || ''}
+      textureUrl={piece.textureUrl || ''}
     />
   {:else}
     <Piece

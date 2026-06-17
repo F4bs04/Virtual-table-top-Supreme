@@ -1583,6 +1583,90 @@ export const networkState = $state({
     networkState.addLog("Offline Solo/Local GM mode active. signaling server connection skipped.");
   },
 
+  // 3D Shape Creator
+  add3DShape(name, shapeType, color, size = 1) {
+    if (networkState.role !== 'host') {
+      networkState.addLog('BLOCKED: Only the Host can create 3D shapes.');
+      return;
+    }
+    const id = `shape-${Date.now()}`;
+    const midPoint = Math.floor((networkState.gameState.gridSize || 24) / 2);
+    networkState.gameState.pieces[id] = {
+      id,
+      name,
+      class: 'objeto',
+      structureType: '3d-shape',
+      shapeType,
+      x: midPoint,
+      y: 0,
+      z: midPoint,
+      color,
+      width: size,
+      depth: size,
+      height: size,
+      textureUrl: '',
+      modelUrl: '',
+      hp: null,
+      maxHp: null,
+      notes: '',
+      photos: []
+    };
+    networkState.addLog(`Added 3D shape: ${name} (${shapeType}, size: ${size})`);
+    networkState.broadcastGameState();
+  },
+
+  async importModel(file) {
+    if (networkState.role !== 'host') {
+      networkState.addLog('BLOCKED: Only the Host can import 3D models.');
+      return;
+    }
+    if (!file || !file.name.match(/\.(glb|gltf)$/i)) {
+      networkState.addLog('BLOCKED: Please select a .glb or .gltf file.');
+      return;
+    }
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      networkState.addLog(`BLOCKED: File too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max: 5MB.`);
+      return;
+    }
+
+    try {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const id = `shape-${Date.now()}`;
+      const midPoint = Math.floor((networkState.gameState.gridSize || 24) / 2);
+      networkState.gameState.pieces[id] = {
+        id,
+        name: file.name.replace(/\.[^/.]+$/, ''),
+        class: 'objeto',
+        structureType: '3d-shape',
+        shapeType: 'imported',
+        x: midPoint,
+        y: 0,
+        z: midPoint,
+        color: '#ffffff',
+        modelUrl: dataUrl,
+        width: undefined,
+        depth: undefined,
+        height: undefined,
+        radius: undefined,
+        hp: null,
+        maxHp: null,
+        notes: '',
+        photos: []
+      };
+      networkState.addLog(`Imported 3D model: ${file.name} (${(dataUrl.length / 1024 / 1024).toFixed(1)}MB)`);
+      networkState.broadcastGameState();
+    } catch (err) {
+      networkState.addLog(`FAILED to import model: ${err.message}`);
+    }
+  },
+
   // Reset and disconnect WebRTC session
   disconnect() {
     if (networkState.peer) {
