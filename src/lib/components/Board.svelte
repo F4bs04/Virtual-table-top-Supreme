@@ -21,21 +21,24 @@
             networkState.floorDrawingPoints = [];
             networkState.drawingStartHex = null;
             networkState.drawingMode = false;
-            networkState.activeTool = 'hand';
-            networkState.addLog('Floor drawing cancelled (ESC).');
+            networkState.activeTool = 'select';
+            networkState.addLog('Floor drawing cancelled (ESC). Select tool active.');
           } else if (networkState.drawingStartHex !== null) {
             networkState.drawingStartHex = null;
-            networkState.addLog('Wall chain stopped (ESC). Click to start a new wall or press ESC again to exit draw mode.');
+            networkState.drawingMode = false;
+            networkState.activeTool = 'select';
+            networkState.addLog('Wall chain stopped (ESC). Select tool active.');
           } else {
             networkState.drawingMode = false;
-            networkState.activeTool = 'hand';
-            networkState.addLog('Draw mode exited (ESC). Camera hand tool active.');
+            networkState.activeTool = 'select';
+            networkState.addLog('Draw mode exited (ESC). Select tool active.');
           }
         } else {
           networkState.dashMode = false;
           networkState.moveLockPieceId = null;
           networkState.selectedPieceId = null;
-          networkState.addLog('Selection cancelled (ESC).');
+          networkState.activeTool = 'select';
+          networkState.addLog('Selection cancelled (ESC). Select tool active.');
         }
       } else if (e.key === 'Enter') {
         if (networkState.drawingMode && networkState.activeTool === 'draw-floor' && networkState.floorDrawingPoints.length >= 4) {
@@ -295,7 +298,7 @@
             networkState.floorDrawingPoints = [];
             networkState.drawingStartHex = null;
             networkState.drawingMode = false;
-            networkState.activeTool = 'hand';
+            networkState.activeTool = 'select';
             networkState.addLog('Floor polygon completed!');
           }}
           title="Close and complete floor polygon"

@@ -3,6 +3,7 @@
   import { onMount, onDestroy } from 'svelte';
   import * as THREE from 'three';
   import { networkState } from '../networkState.svelte.js';
+  import { hexToWorld } from '../hexGeometry.js';
 
   let {
     id,
@@ -16,7 +17,8 @@
     shapeType = 'box',
     modelUrl = '',
     textureUrl = '',
-    rotation = 0
+    rotation = 0,
+    isObstructing = false
   } = $props();
 
   let modelScene = $state(null);
@@ -247,15 +249,61 @@
   });
   const isVisible = $derived(opacityMultiplier > 0.05);
 
-  // Adjust opacity for imported GLTF model meshes
+  // Check if any player character is inside this 3D shape's bounding box
+  const isCharacterInside = $derived.by(() => {
+    const wVal = width || 1;
+    const dVal = depth || 1;
+    const hVal = height || 1;
+    
+    // Get all player character pieces
+    const characters = Object.values(networkState.gameState.pieces).filter(
+      p => p.class === 'personagem'
+    );
+    
+    return characters.some(p => {
+      const wp = hexToWorld(p.x, p.z);
+      const py = networkState.getPieceRenderHeight(p);
+      
+      const dx = wp.x - x;
+      const dz = wp.z - z;
+      const dy = py - y;
+      
+      // Rotate back by the object's rotation (around Y axis)
+      const cos = Math.cos(-rotation);
+      const sin = Math.sin(-rotation);
+      const localX = dx * cos - dz * sin;
+      const localZ = dx * sin + dz * cos;
+      
+      const margin = 0.25; // generous margin for playability
+      const insideX = Math.abs(localX) <= (wVal / 2 + margin);
+      const insideZ = Math.abs(localZ) <= (dVal / 2 + margin);
+      const insideY = dy >= -margin && dy <= (hVal + margin);
+      
+      return insideX && insideZ && insideY;
+    });
+  });
+
+  const isCutAway = $derived(isCharacterInside || isObstructing);
+  const finalOpacity = $derived((isCutAway ? 0.25 : 1.0) * opacityMultiplier);
+
+  // Adjust opacity and register structureId for imported GLTF model meshes
   $effect(() => {
     if (modelScene) {
       modelScene.traverse((child) => {
-        if (child.isMesh && child.material) {
-          child.material.transparent = opacityMultiplier < 0.95;
-          child.material.opacity = (child.userData.originalOpacity !== undefined ? child.userData.originalOpacity : 1.0) * opacityMultiplier;
-          if (child.userData.originalOpacity === undefined) {
-            child.userData.originalOpacity = child.material.opacity ?? 1.0;
+        if (child.isMesh) {
+          if (!child.userData) child.userData = {};
+          child.userData.structureId = id; // register for raycast walls detection
+          
+          if (child.material) {
+            child.material.transparent = finalOpacity < 0.95;
+            child.material.opacity = (child.userData.originalOpacity !== undefined ? child.userData.originalOpacity : 1.0) * finalOpacity;
+            if (child.userData.originalOpacity === undefined) {
+              child.userData.originalOpacity = child.material.opacity ?? 1.0;
+            }
+            child.material.side = isCutAway ? THREE.BackSide : (child.userData.originalSide !== undefined ? child.userData.originalSide : THREE.DoubleSide);
+            if (child.userData.originalSide === undefined) {
+              child.userData.originalSide = child.material.side;
+            }
           }
         }
       });
@@ -372,18 +420,18 @@
   }
 </script>
 
-<T.Group position={[x, y, z]} rotation={[0, rotation, 0]} onclick={handleClick} userData={{ pieceId: id, pieceClass: 'objeto' }} visible={isVisible}>
+<T.Group position={[x, y, z]} rotation={[0, rotation, 0]} onclick={handleClick} userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }} visible={isVisible}>
   {#if shapeType === 'imported'}
-    <T.Group bind:ref={groupRef} userData={{ pieceId: id, pieceClass: 'objeto' }}>
+    <T.Group bind:ref={groupRef} userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}>
       {#if !modelScene && !loadError}
         <T.Mesh position={[0, 0.15, 0]}>
           <T.BoxGeometry args={[0.3, 0.3, 0.3]} />
-          <T.MeshBasicMaterial color={color} transparent opacity={0.3 * opacityMultiplier} />
+          <T.MeshBasicMaterial color={color} transparent opacity={0.3 * finalOpacity} />
         </T.Mesh>
       {:else if loadError}
         <T.Mesh position={[0, 0.25, 0]}>
           <T.BoxGeometry args={[0.5, 0.5, 0.5]} />
-          <T.MeshBasicMaterial color="#ef4444" wireframe transparent opacity={opacityMultiplier} />
+          <T.MeshBasicMaterial color="#ef4444" wireframe transparent opacity={finalOpacity} />
         </T.Mesh>
       {/if}
     </T.Group>
@@ -391,99 +439,99 @@
   {:else if shapeType === 'castle-wall'}
     <T.Mesh position={[0, h * 0.5, 0]}
       onpointerdown={handlePointerDown}
-      userData={{ pieceId: id, pieceClass: 'objeto' }}
+      userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
     >
       <T.BoxGeometry args={[w, h * 0.75, d]} />
-      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.8} metalness={0.1} transparent={opacityMultiplier < 0.95} opacity={opacityMultiplier} />
+      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.8} metalness={0.1} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
     </T.Mesh>
     {#each battlementsData as b (b.cx)}
       <T.Mesh position={[b.cx, h * 0.875, 0]}
         onpointerdown={handlePointerDown}
-        userData={{ pieceId: id, pieceClass: 'objeto' }}
+        userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
       >
         <T.BoxGeometry args={[b.bw, b.bh, d * 0.8]} />
-        <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.8} metalness={0.1} transparent={opacityMultiplier < 0.95} opacity={opacityMultiplier} />
+        <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.8} metalness={0.1} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
       </T.Mesh>
     {/each}
     {#if networkState.activeTool === 'move'}
       <T.Mesh position={[0, h * 0.5, 0]}
         onpointerdown={handlePointerDown}
-        userData={{ pieceId: id, pieceClass: 'objeto' }}
+        userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
       >
         <T.BoxGeometry args={[w + 0.02, h + 0.02, d + 0.02]} />
-        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.15 * opacityMultiplier} />
+        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.15 * finalOpacity} />
       </T.Mesh>
     {/if}
 
   {:else if shapeType === 'box'}
     <T.Mesh position={[0, h * 0.5, 0]}
       onpointerdown={handlePointerDown}
-      userData={{ pieceId: id, pieceClass: 'objeto' }}
+      userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
     >
       <T.BoxGeometry args={[w, h, d]} />
-      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={opacityMultiplier < 0.95} opacity={opacityMultiplier} />
+      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
     </T.Mesh>
     {#if networkState.activeTool === 'move'}
       <T.Mesh position={[0, h * 0.5, 0]}
         onpointerdown={handlePointerDown}
-        userData={{ pieceId: id, pieceClass: 'objeto' }}
+        userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
       >
         <T.BoxGeometry args={[w + 0.02, h + 0.02, d + 0.02]} />
-        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2 * opacityMultiplier} />
+        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2 * finalOpacity} />
       </T.Mesh>
     {/if}
 
   {:else if shapeType === 'cylinder'}
     <T.Mesh position={[0, h * 0.5, 0]}
       onpointerdown={handlePointerDown}
-      userData={{ pieceId: id, pieceClass: 'objeto' }}
+      userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
     >
       <T.CylinderGeometry args={[w / 2, w / 2, h, 24]} />
-      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={opacityMultiplier < 0.95} opacity={opacityMultiplier} />
+      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
     </T.Mesh>
     {#if networkState.activeTool === 'move'}
       <T.Mesh position={[0, h * 0.5, 0]}
         onpointerdown={handlePointerDown}
-        userData={{ pieceId: id, pieceClass: 'objeto' }}
+        userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
       >
         <T.CylinderGeometry args={[w / 2 + 0.02, w / 2 + 0.02, h + 0.02, 24]} />
-        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2 * opacityMultiplier} />
+        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2 * finalOpacity} />
       </T.Mesh>
     {/if}
 
   {:else if shapeType === 'sphere'}
     <T.Mesh position={[0, w / 2, 0]}
       onpointerdown={handlePointerDown}
-      userData={{ pieceId: id, pieceClass: 'objeto' }}
+      userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
     >
       <T.SphereGeometry args={[w / 2, 24, 24]} />
-      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={opacityMultiplier < 0.95} opacity={opacityMultiplier} />
+      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
     </T.Mesh>
     {#if networkState.activeTool === 'move'}
       <T.Mesh position={[0, w / 2, 0]}
         onpointerdown={handlePointerDown}
-        userData={{ pieceId: id, pieceClass: 'objeto' }}
+        userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
       >
         <T.SphereGeometry args={[w / 2 + 0.02, 24, 24]} />
-        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2 * opacityMultiplier} />
+        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2 * finalOpacity} />
       </T.Mesh>
     {/if}
 
   {:else if shapeType === 'pyramid'}
     <T.Mesh position={[0, h * 0.5, 0]}
       onpointerdown={handlePointerDown}
-      userData={{ pieceId: id, pieceClass: 'objeto' }}
+      userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
     >
       <T.ConeGeometry args={[w / 2, h, 4]} />
-      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={opacityMultiplier < 0.95} opacity={opacityMultiplier} />
+      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
     </T.Mesh>
     {#if networkState.activeTool === 'move'}
       <T.Mesh position={[0, h * 0.5, 0]}
         onpointerdown={handlePointerDown}
-        userData={{ pieceId: id, pieceClass: 'objeto' }}
+        userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
       >
         <T.ConeGeometry args={[w / 2 + 0.02, h + 0.02, 4]} />
-        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2 * opacityMultiplier} />
+        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2 * finalOpacity} />
       </T.Mesh>
     {/if}
 
@@ -495,19 +543,19 @@
         <T.Mesh 
           position={[0, stepHeight * (i + 0.5), -d/2 + stepDepth * (i + 0.5)]}
           onpointerdown={handlePointerDown}
-          userData={{ pieceId: id, pieceClass: 'objeto' }}
+          userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
         >
           <T.BoxGeometry args={[w, stepHeight, stepDepth * (5 - i)]} />
-          <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={opacityMultiplier < 0.95} opacity={opacityMultiplier} />
+          <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
         </T.Mesh>
       {/each}
       {#if networkState.activeTool === 'move'}
         <T.Mesh position={[0, h * 0.5, 0]}
           onpointerdown={handlePointerDown}
-          userData={{ pieceId: id, pieceClass: 'objeto' }}
+          userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
         >
           <T.BoxGeometry args={[w + 0.02, h + 0.02, d + 0.02]} />
-          <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2 * opacityMultiplier} />
+          <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2 * finalOpacity} />
         </T.Mesh>
       {/if}
     </T.Group>
@@ -515,18 +563,18 @@
   {:else if shapeType === 'round-roof'}
     <T.Mesh position={[0, h * 0.5, 0]}
       onpointerdown={handlePointerDown}
-      userData={{ pieceId: id, pieceClass: 'objeto' }}
+      userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
     >
       <T.ConeGeometry args={[w / 2, h, 24]} />
-      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={opacityMultiplier < 0.95} opacity={opacityMultiplier} />
+      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
     </T.Mesh>
     {#if networkState.activeTool === 'move'}
       <T.Mesh position={[0, h * 0.5, 0]}
         onpointerdown={handlePointerDown}
-        userData={{ pieceId: id, pieceClass: 'objeto' }}
+        userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
       >
         <T.ConeGeometry args={[w / 2 + 0.02, h + 0.02, 24]} />
-        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2 * opacityMultiplier} />
+        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2 * finalOpacity} />
       </T.Mesh>
     {/if}
 
@@ -534,17 +582,17 @@
     <T.Mesh position={[0, h * 0.5, 0]}
       geometry={roofGeometry}
       onpointerdown={handlePointerDown}
-      userData={{ pieceId: id, pieceClass: 'objeto' }}
+      userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
     >
-      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={opacityMultiplier < 0.95} opacity={opacityMultiplier} />
+      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
     </T.Mesh>
     {#if networkState.activeTool === 'move'}
       <T.Mesh position={[0, h * 0.5, 0]}
         geometry={roofGeometry}
         onpointerdown={handlePointerDown}
-        userData={{ pieceId: id, pieceClass: 'objeto' }}
+        userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
       >
-        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2 * opacityMultiplier} />
+        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2 * finalOpacity} />
       </T.Mesh>
     {/if}
   {/if}

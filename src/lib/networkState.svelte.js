@@ -522,9 +522,10 @@ export const networkState = $state({
       networkState.addLog('BLOCKED: Only the Host can change piece textures.');
       return;
     }
-    if (networkState.gameState.pieces[pieceId]) {
-      networkState.gameState.pieces[pieceId].textureUrl = url;
-      networkState.addLog(`Updated texture for piece: ${networkState.gameState.pieces[pieceId].name}`);
+    const piece = networkState.getPiece(pieceId);
+    if (piece) {
+      piece.textureUrl = url;
+      networkState.addLog(`Updated texture for piece: ${piece.name}`);
       networkState.broadcastGameState();
     }
   },
@@ -566,7 +567,7 @@ export const networkState = $state({
       return;
     }
 
-    const piece = networkState.gameState.pieces[pieceId];
+    const piece = networkState.getPiece(pieceId);
     if (!piece) return;
 
     if (typeof updates.name === 'string' && updates.name.trim()) {
@@ -610,6 +611,12 @@ export const networkState = $state({
     }
     if (typeof updates.flipX === 'boolean') {
       piece.flipX = updates.flipX;
+    }
+    if (typeof updates.group === 'string') {
+      piece.group = updates.group;
+    }
+    if (typeof updates.visibleOnMap === 'boolean') {
+      piece.visibleOnMap = updates.visibleOnMap;
     }
 
     networkState.addLog(`Updated asset details: ${piece.name}`);
@@ -1130,7 +1137,7 @@ export const networkState = $state({
 
   // Update piece character sheet (HP, notes) — available to GM and clients for own chars
   updatePieceSheet(pieceId, updates) {
-    const piece = networkState.gameState.pieces[pieceId];
+    const piece = networkState.getPiece(pieceId);
     if (!piece) return;
 
     if (networkState.role === 'host') {
@@ -1463,9 +1470,15 @@ export const networkState = $state({
       networkState.addLog('BLOCKED: Only the Host can delete pieces.');
       return;
     }
-    const piece = networkState.gameState.pieces[pieceId];
+    const piece = networkState.getPiece(pieceId);
     if (piece) {
       delete networkState.gameState.pieces[pieceId];
+      const envs = networkState.gameState.environments || {};
+      Object.keys(envs).forEach(envId => {
+        if (envs[envId].pieces) {
+          delete envs[envId].pieces[pieceId];
+        }
+      });
       if (networkState.selectedPieceId === pieceId) {
         networkState.selectedPieceId = null;
       }

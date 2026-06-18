@@ -1,10 +1,39 @@
 <script>
   import { networkState } from '../networkState.svelte.js';
 
+  let showTexturePopup = $state(false);
+  let showBleachPopup = $state(false);
+
+  const standardTextures = [
+    { name: 'Black Brick', path: '/Model/textures/Black_brick.png' },
+    { name: 'Brick Texture', path: '/Model/textures/Bricktexture.png' },
+    { name: 'Gray Brick', path: '/Model/textures/Bricktexture_gray.png' }
+  ];
+
+  const bleachCollection = [
+    { name: 'Arrancar 1 Jaliel', path: '/Model/bleach Collection/Arrancar 1 Jaliel.png' },
+    { name: 'Jaliel Ressurection', path: '/Model/bleach Collection/Jaliel Ressurection.png' },
+    { name: 'Jaliel True Ressurection', path: '/Model/bleach Collection/Jaliel True Ressurection.png' },
+    { name: 'Melisante Arrancar 2', path: '/Model/bleach Collection/Melisante Arrancar 2.png' },
+    { name: 'Melisante Ressurection', path: '/Model/bleach Collection/Melisante Ressurection.png' },
+    { name: 'Melisante Shikai', path: '/Model/bleach Collection/Melisante Shikai.png' },
+    { name: 'Melisante True Ressurection', path: '/Model/bleach Collection/Melisante True Ressurection.png' },
+    { name: 'Shinigami Knox Bankai', path: '/Model/bleach Collection/Shinigami Knox bankai.png' },
+    { name: 'Shinigami Knox', path: '/Model/bleach Collection/Shinigami Knox.png' },
+    { name: 'Shinigami Nelson', path: '/Model/bleach Collection/Shinigami Nelson.png' },
+    { name: 'Shinigami Raiden', path: '/Model/bleach Collection/Shinigami Raiden.png' },
+    { name: 'Shinigami Serjão Bankai', path: '/Model/bleach Collection/Shinimgami Serjão bankai.png' },
+    { name: 'Shinigami Serjão', path: '/Model/bleach Collection/Shinimgami Serjão.png' },
+    { name: 'Hollow Ksante', path: '/Model/bleach Collection/hollow Ksante.png' },
+    { name: 'Hollow Azul', path: '/Model/bleach Collection/hollow azul.png' },
+    { name: 'Monstro Hollow', path: '/Model/bleach Collection/monstro hollow.png' },
+    { name: 'Urahara', path: '/Model/bleach Collection/urahra.png' }
+  ];
+
   // ── Derived state ──────────────────────────────────────────────────────────
   const piece = $derived(
     networkState.selectedPieceId
-      ? (networkState.gameState.pieces[networkState.selectedPieceId] ?? null)
+      ? (networkState.getPiece(networkState.selectedPieceId) ?? null)
       : null
   );
 
@@ -641,14 +670,24 @@
             <!-- Texture upload -->
             <div class="prop-row">
               <label class="prop-label">Textura</label>
-              <label class="tex-upload-btn">
-                {piece.textureUrl ? '🔄 Alterar' : '📁 Upload'}
-                <input
-                  type="file"
-                  accept="image/*"
-                  onchange={uploadTextureFromInput}
-                />
-              </label>
+              <div style="display: flex; gap: 0.35rem; width: 100%;">
+                <label class="tex-upload-btn" style="flex: 1; margin: 0; text-align: center;">
+                  {piece.textureUrl ? '🔄 Alterar' : '📁 Upload'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onchange={uploadTextureFromInput}
+                  />
+                </label>
+                <button
+                  type="button"
+                  class="tex-upload-btn"
+                  style="background: rgba(168, 85, 247, 0.2); border-color: #a855f7; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.25rem;"
+                  onclick={() => showTexturePopup = true}
+                >
+                  🎨 Galeria
+                </button>
+              </div>
             </div>
           </div>
         </section>
@@ -783,14 +822,24 @@
               </div>
               <div class="prop-row">
                 <label class="prop-label">Foto</label>
-                <label class="tex-upload-btn">
-                  {piece.textureUrl ? '🔄 Alterar' : '📁 Upload'}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onchange={uploadTextureFromInput}
-                  />
-                </label>
+                <div style="display: flex; gap: 0.35rem; width: 100%;">
+                  <label class="tex-upload-btn" style="flex: 1; margin: 0; text-align: center;">
+                    {piece.textureUrl ? '🔄 Alterar' : '📁 Upload'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onchange={uploadTextureFromInput}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    class="tex-upload-btn"
+                    style="background: rgba(6, 182, 212, 0.2); border-color: #06b6d4; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.25rem;"
+                    onclick={() => showBleachPopup = true}
+                  >
+                    🎭 Coleção
+                  </button>
+                </div>
               </div>
             {/if}
             {#if canEditSheet}
@@ -878,6 +927,48 @@
 
     </div>
   </aside>
+{/if}
+
+{#if showTexturePopup && piece}
+  <div class="sheet-popup-overlay" onclick={() => showTexturePopup = false}>
+    <div class="sheet-popup-card" onclick={(e) => e.stopPropagation()}>
+      <div class="popup-title-row">
+        <h4>🎨 Texturas Padrão</h4>
+        <button class="popup-close-x" onclick={() => showTexturePopup = false}>✕</button>
+      </div>
+      <div class="popup-grid-container">
+        {#each standardTextures as tex}
+          <button class="popup-grid-item" onclick={() => { networkState.updatePieceTexture(piece.id, tex.path); showTexturePopup = false; }}>
+            <img src={tex.path} alt={tex.name} class="popup-item-thumb" />
+            <span class="popup-item-name">{tex.name}</span>
+          </button>
+        {/each}
+        <button class="popup-grid-item" style="background: rgba(239, 68, 68, 0.05); border-color: rgba(239, 68, 68, 0.2);" onclick={() => { networkState.updatePieceTexture(piece.id, ''); showTexturePopup = false; }}>
+          <div class="popup-item-thumb no-tex-thumb">✕</div>
+          <span class="popup-item-name" style="color: #f87171;">Sem Textura</span>
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+{#if showBleachPopup && piece}
+  <div class="sheet-popup-overlay" onclick={() => showBleachPopup = false}>
+    <div class="sheet-popup-card bleach-card" onclick={(e) => e.stopPropagation()}>
+      <div class="popup-title-row">
+        <h4>🎭 Coleção Bleach</h4>
+        <button class="popup-close-x" onclick={() => showBleachPopup = false}>✕</button>
+      </div>
+      <div class="popup-grid-container bleach-grid">
+        {#each bleachCollection as item}
+          <button class="popup-grid-item" onclick={() => { networkState.updatePieceTexture(piece.id, item.path); showBleachPopup = false; }}>
+            <img src={item.path} alt={item.name} class="popup-item-thumb character-thumb" />
+            <span class="popup-item-name">{item.name}</span>
+          </button>
+        {/each}
+      </div>
+    </div>
+  </div>
 {/if}
 
 <style>
@@ -1461,5 +1552,119 @@
   }
   .ep-slider::-webkit-slider-runnable-track {
     background: linear-gradient(90deg, #0ea5e9 var(--val, 50%), rgba(255,255,255,0.1) var(--val, 50%));
+  }
+
+  /* ── Popups ── */
+  .sheet-popup-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .sheet-popup-card {
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid rgba(168, 85, 247, 0.3);
+    border-radius: 16px;
+    padding: 1.5rem;
+    max-width: 400px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.7);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .sheet-popup-card.bleach-card {
+    max-width: 600px;
+    border-color: rgba(6, 182, 212, 0.3);
+  }
+  .popup-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 0.5rem;
+  }
+  .popup-title-row h4 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: #e2e8f0;
+  }
+  .popup-close-x {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+  .popup-close-x:hover {
+    color: #ef4444;
+  }
+  .popup-grid-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 0.75rem;
+    overflow-y: auto;
+  }
+  .popup-grid-item {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 0.5rem;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    transition: all 0.2s;
+  }
+  .popup-grid-item:hover {
+    background: rgba(168, 85, 247, 0.15);
+    border-color: #a855f7;
+    transform: translateY(-2px);
+  }
+  .bleach-grid .popup-grid-item:hover {
+    background: rgba(6, 182, 212, 0.15);
+    border-color: #06b6d4;
+  }
+  .popup-item-thumb {
+    width: 80px;
+    height: 80px;
+    border-radius: 6px;
+    object-fit: cover;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .popup-item-thumb.character-thumb {
+    border-radius: 50%;
+  }
+  .popup-item-name {
+    font-size: 0.7rem;
+    color: #cbd5e1;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+  }
+  .no-tex-thumb {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(239, 68, 68, 0.1);
+    color: #f87171;
+    font-size: 1.5rem;
+    font-weight: bold;
+    border-color: rgba(239, 68, 68, 0.3);
+    width: 80px;
+    height: 80px;
+    border-radius: 6px;
   }
 </style>

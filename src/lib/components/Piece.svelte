@@ -387,7 +387,7 @@
 </script>
 
 <!-- Group to position the piece and its selection indicator -->
-<T.Group position={[currentX, currentY, currentZ]} visible={isVisible}>
+<T.Group position={[currentX, currentY, currentZ]} visible={isVisible && (pieceData?.visibleOnMap !== false)}>
   
   <!-- Pulsing Selection Base Ring (rendered flat on floor Y=0) -->
   {#if isSelected}

@@ -519,7 +519,7 @@
               networkState.floorDrawingPoints = [];
               networkState.drawingStartHex = null;
               networkState.drawingMode = false;
-              networkState.activeTool = 'hand';
+              networkState.activeTool = 'select';
             } else {
               networkState.addLog("O chão precisa de pelo menos 4 vértices para fechar a forma.");
             }
@@ -558,10 +558,10 @@
 
           networkState.addDrawnStructure(c_center, r_center, w, d, structType);
 
-          // Non-wall types: reset back to hand tool
+          // Non-wall types: reset back to select tool
           networkState.drawingStartHex = null;
           networkState.drawingMode = false;
-          networkState.activeTool = 'hand';
+          networkState.activeTool = 'select';
         }
       }
       return;
@@ -724,6 +724,14 @@
       if (e.button === 2) {
         rightClickStartTime = Date.now();
         rightClickStartPos = { x: e.clientX, y: e.clientY };
+
+        if (networkState.drawingMode) {
+          networkState.drawingStartHex = null;
+          networkState.floorDrawingPoints = [];
+          networkState.drawingMode = false;
+          networkState.activeTool = 'select';
+          networkState.addLog('Construção cancelada (botão direito). Modo select ativo.');
+        }
       }
     };
 
@@ -1383,6 +1391,7 @@
       modelUrl={piece.modelUrl || ''}
       textureUrl={piece.textureUrl || ''}
       rotation={piece.rotation || 0}
+      isObstructing={networkState.obstructedStructureIds.has(piece.id)}
     />
   {:else}
     <Piece

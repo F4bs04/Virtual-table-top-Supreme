@@ -19,10 +19,51 @@
   let houseFloors = $state(2);
   let houseColor = $state('#475569');
   let activeTab = $state('tokens'); // 'map' | 'tokens' | 'logs'
+  let collapsedGroups = $state({}); // track collapsible group headers
+  let newGroupName = $state('');
+  let customGroups = $state([]);
+
+  function addGroup() {
+    const name = newGroupName.trim();
+    if (name) {
+      if (!customGroups.includes(name)) {
+        customGroups = [...customGroups, name];
+      }
+      newGroupName = '';
+      networkState.addLog(`Grupo criado: ${name}`);
+    }
+  }
+
+  const groupedPieces = $derived.by(() => {
+    const groups = {};
+    const currentEnvId = networkState.gameState.currentEnvironmentId || 'env-1';
+    
+    // Initialize custom groups
+    customGroups.forEach(g => {
+      groups[g] = [];
+    });
+    
+    // Characters/tokens
+    const chars = Object.values(networkState.gameState.pieces || {});
+    
+    // Objects/walls/structures of the current environment
+    const envObjs = Object.values(networkState.gameState.environments?.[currentEnvId]?.pieces || {});
+    
+    const allPieces = [...chars, ...envObjs];
+    
+    allPieces.forEach(piece => {
+      const grp = piece.group?.trim() || 'Sem Grupo';
+      if (!groups[grp]) {
+        groups[grp] = [];
+      }
+      groups[grp].push(piece);
+    });
+    return groups;
+  });
 
   const selectedPiece = $derived.by(() => {
     if (!networkState.selectedPieceId) return null;
-    return networkState.gameState.pieces[networkState.selectedPieceId] ?? null;
+    return networkState.getPiece(networkState.selectedPieceId);
   });
 
   const accessibleHouse = $derived.by(() => {
@@ -664,67 +705,186 @@
 
           <!-- Tokens List -->
           <div class="glass-card texture-upload-section fade-in" style="padding: 1rem;">
-            <h4 class="mini-title" style="margin: 0 0 0.5rem;">Lista de Tokens:</h4>
-            <div class="pieces-uploader" style="display: flex; flex-direction: column; gap: 0.4rem; max-height: 300px; overflow-y: auto;">
-              {#each Object.values(networkState.gameState.pieces) as piece (piece.id)}
-                <div
-                  class="piece-uploader-row {networkState.selectedPieceId === piece.id ? 'selected-row' : ''}"
-                  style="padding: 0.4rem 0.6rem; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); border-radius: 6px; cursor: pointer; border: 1px solid {networkState.selectedPieceId === piece.id ? piece.color : 'transparent'};"
-                  onclick={() => selectPiece(piece.id)}
-                  role="button"
-                  tabindex="0"
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+              <h4 class="mini-title" style="margin: 0;">Lista de Tokens:</h4>
+              
+              <!-- Add Group UI -->
+              {#if networkState.role === 'host'}
+                <div style="display: flex; gap: 0.3rem; align-items: center;">
+                  <input
+                    type="text"
+                    placeholder="Novo grupo..."
+                    bind:value={newGroupName}
+                    style="font-size: 0.72rem; padding: 0.25rem 0.45rem; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; color: #fff; width: 100px; outline: none; font-family: inherit;"
+                    onkeydown={(e) => {
+                      if (e.key === 'Enter') {
+                        addGroup();
+                      }
+                    }}
+                  />
+                  <button
+                    onclick={addGroup}
+                    style="background: #a855f7; border: none; color: #fff; padding: 0.25rem 0.6rem; border-radius: 4px; font-size: 0.72rem; font-weight: bold; cursor: pointer; transition: background 0.2s;"
+                    onmouseover={(e) => e.target.style.background = '#c084fc'}
+                    onmouseout={(e) => e.target.style.background = '#a855f7'}
+                  >
+                    + Grupo
+                  </button>
+                </div>
+              {/if}
+            </div>
+
+            <div class="pieces-uploader" style="display: flex; flex-direction: column; gap: 0.6rem; max-height: 400px; overflow-y: auto;">
+              {#each Object.entries(groupedPieces) as [groupName, groupPieces]}
+                {@const isCollapsed = collapsedGroups[groupName]}
+                {@const allVisible = groupPieces.every(p => p.visibleOnMap !== false)}
+                <div class="group-wrapper" 
+                  style="border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; background: rgba(0,0,0,0.15); overflow: hidden; transition: border-color 0.2s;"
+                  ondragover={(e) => {
+                    e.preventDefault();
+                    if (networkState.role === 'host') {
+                      e.currentTarget.style.borderColor = '#a855f7';
+                    }
+                  }}
+                  ondragleave={(e) => {
+                    e.preventDefault();
+                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
+                  }}
+                  ondrop={(e) => {
+                    e.preventDefault();
+                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
+                    if (networkState.role !== 'host') return;
+                    const pieceId = e.dataTransfer.getData('text/plain');
+                    if (pieceId) {
+                      networkState.updatePieceDetails(pieceId, { group: groupName });
+                      networkState.addLog(`Token movido para o grupo: ${groupName}`);
+                    }
+                  }}
                 >
-                  <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 0;">
-                    <div style="width: 8px; height: 8px; border-radius: 50%; background: {piece.color}; flex-shrink: 0;"></div>
-                    <span class="piece-name" style="font-size: 0.82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;">
-                      {piece.name}
-                    </span>
-                    {#if piece.class === 'personagem' && piece.maxHp}
-                      <span style="font-size: 0.65rem; font-family: monospace; color: #64748b; flex-shrink: 0;">{piece.hp ?? 0}/{piece.maxHp}</span>
-                    {/if}
-                  </div>
-                  <div class="piece-actions" style="display: flex; gap: 0.25rem; flex-shrink: 0; margin-left: 0.4rem;">
-                    {#if networkState.role === 'host'}
-                      <button
-                        type="button"
-                        class="file-upload-btn"
-                        title="Adicionar imagem"
-                        onclick={(e) => {
-                          e.stopPropagation();
-                          document.getElementById(`texture-upload-${piece.id}`)?.click();
-                        }}
-                        style="margin: 0; padding: 0.15rem 0.35rem; font-size: 0.65rem; line-height: 1.2; cursor: pointer;"
-                      >
-                        Img
-                      </button>
-                      <input
-                        id={`texture-upload-${piece.id}`}
-                        type="file"
-                        accept="image/*"
-                        onchange={(e) => handleTextureUpload(e, piece.id)}
-                        onclick={(e) => e.stopPropagation()}
-                        style="display: none;"
-                      />
-                      {#if piece.textureUrl}
+                  <!-- Group Header -->
+                  <div class="group-header" 
+                    style="display: flex; align-items: center; justify-content: space-between; padding: 0.35rem 0.65rem; background: rgba(168, 85, 247, 0.08); border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer;"
+                    onclick={() => collapsedGroups[groupName] = !isCollapsed}
+                  >
+                    <div style="display: flex; align-items: center; gap: 0.4rem;">
+                      <span style="font-size: 0.75rem; color: #94a3b8; transition: transform 0.2s; transform: rotate({isCollapsed ? '-90deg' : '0deg'});">▼</span>
+                      <strong style="font-size: 0.78rem; color: #fbbf24; text-transform: uppercase; letter-spacing: 0.05rem;">{groupName}</strong>
+                      <span style="font-size: 0.65rem; color: #64748b; font-family: monospace;">({groupPieces.length})</span>
+                    </div>
+                    
+                    <div style="display: flex; align-items: center; gap: 0.4rem;" onclick={(e) => e.stopPropagation()}>
+                      {#if networkState.role === 'host'}
+                        <!-- Group visibility bulk toggle -->
                         <button
-                          onclick={(e) => { e.stopPropagation(); networkState.updatePieceTexture(piece.id, ''); }}
-                          class="delete-piece-btn"
-                          title="Remover imagem"
-                          style="padding: 0.15rem 0.35rem; font-size: 0.65rem;"
+                          type="button"
+                          class="file-upload-btn"
+                          title={allVisible ? "Ocultar todos no mapa" : "Mostrar todos no mapa"}
+                          onclick={() => {
+                            groupPieces.forEach(p => networkState.updatePieceDetails(p.id, { visibleOnMap: !allVisible }));
+                          }}
+                          style="margin: 0; padding: 0.15rem 0.35rem; font-size: 0.65rem; background: {allVisible ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)'}; border-color: {allVisible ? 'rgba(34,197,94,0.4)' : 'rgba(239,68,68,0.4)'}; color: {allVisible ? '#4ade80' : '#f87171'};"
                         >
-                          Img ✕
+                          {allVisible ? "👁️ Visível" : "👁️‍🗨️ Oculto"}
                         </button>
                       {/if}
-                      <button 
-                        onclick={(e) => { e.stopPropagation(); networkState.deletePiece(piece.id); }} 
-                        class="delete-piece-btn"
-                        title="Excluir Token"
-                        style="padding: 0.15rem 0.35rem; font-size: 0.65rem;"
-                      >
-                        ✕
-                      </button>
-                    {/if}
+                    </div>
                   </div>
+
+                  <!-- Group Items -->
+                  {#if !isCollapsed}
+                    <div class="group-items-list" style="display: flex; flex-direction: column; gap: 0.25rem; padding: 0.4rem; min-height: 25px;">
+                      {#if groupPieces.length === 0}
+                        <div style="font-size: 0.72rem; color: #475569; font-style: italic; text-align: center; padding: 0.5rem 0; pointer-events: none;">
+                          Arraste tokens aqui para agrupar
+                        </div>
+                      {:else}
+                        {#each groupPieces as piece (piece.id)}
+                          {@const isPieceVisible = piece.visibleOnMap !== false}
+                          <div
+                            class="piece-uploader-row {networkState.selectedPieceId === piece.id ? 'selected-row' : ''}"
+                            style="padding: 0.35rem 0.5rem; display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.2); border-radius: 6px; cursor: pointer; border: 1px solid {networkState.selectedPieceId === piece.id ? piece.color : 'transparent'}; transition: background 0.15s;"
+                            onclick={() => selectPiece(piece.id)}
+                            draggable={networkState.role === 'host'}
+                            ondragstart={(e) => {
+                              if (networkState.role === 'host') {
+                                e.dataTransfer.setData('text/plain', piece.id);
+                                e.dataTransfer.effectAllowed = 'move';
+                              }
+                            }}
+                            role="button"
+                            tabindex="0"
+                          >
+                            <div style="display: flex; align-items: center; gap: 0.4rem; flex: 1; min-width: 0;">
+                              <div style="width: 8px; height: 8px; border-radius: 50%; background: {piece.color}; flex-shrink: 0;"></div>
+                              <span class="piece-name" style="font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; opacity: {isPieceVisible ? 1.0 : 0.45};">
+                                {piece.name}
+                              </span>
+                              {#if piece.class === 'personagem' && piece.maxHp}
+                                <span style="font-size: 0.65rem; font-family: monospace; color: #64748b; flex-shrink: 0;">{piece.hp ?? 0}/{piece.maxHp}</span>
+                              {/if}
+                            </div>
+                            <div class="piece-actions" style="display: flex; gap: 0.25rem; flex-shrink: 0; margin-left: 0.4rem;" onclick={(e) => e.stopPropagation()}>
+                              <!-- Individual visibility eye toggle -->
+                              <button
+                                type="button"
+                                class="file-upload-btn"
+                                title={isPieceVisible ? "Ocultar da grade 3D" : "Mostrar na grade 3D"}
+                                onclick={() => {
+                                  if (networkState.role === 'host') {
+                                    networkState.updatePieceDetails(piece.id, { visibleOnMap: !isPieceVisible });
+                                  } else {
+                                    networkState.addLog('BLOCKED: Apenas o Mestre pode alterar a visibilidade.');
+                                  }
+                                }}
+                                style="margin: 0; padding: 0.15rem 0.35rem; font-size: 0.65rem; background: {isPieceVisible ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)'}; border-color: {isPieceVisible ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}; color: {isPieceVisible ? '#4ade80' : '#f87171'};"
+                              >
+                                {isPieceVisible ? "👁️" : "👁️‍🗨️"}
+                              </button>
+
+                              {#if networkState.role === 'host'}
+                                <button
+                                  type="button"
+                                  class="file-upload-btn"
+                                  title="Adicionar imagem"
+                                  onclick={() => {
+                                    document.getElementById(`texture-upload-${piece.id}`)?.click();
+                                  }}
+                                  style="margin: 0; padding: 0.15rem 0.35rem; font-size: 0.65rem; line-height: 1.2; cursor: pointer;"
+                                >
+                                  Img
+                                </button>
+                                <input
+                                  id={`texture-upload-${piece.id}`}
+                                  type="file"
+                                  accept="image/*"
+                                  onchange={(e) => handleTextureUpload(e, piece.id)}
+                                  style="display: none;"
+                                />
+                                {#if piece.textureUrl}
+                                  <button
+                                    onclick={() => networkState.updatePieceTexture(piece.id, '')}
+                                    class="delete-piece-btn"
+                                    title="Remover imagem"
+                                    style="padding: 0.15rem 0.35rem; font-size: 0.65rem;"
+                                  >
+                                    Img ✕
+                                  </button>
+                                {/if}
+                                <button 
+                                  onclick={() => networkState.deletePiece(piece.id)} 
+                                  class="delete-piece-btn"
+                                  title="Excluir Token"
+                                  style="padding: 0.15rem 0.35rem; font-size: 0.65rem;"
+                                >
+                                  ✕
+                                </button>
+                              {/if}
+                            </div>
+                          </div>
+                        {/each}
+                      {/if}
+                    </div>
+                  {/if}
                 </div>
               {/each}
             </div>
