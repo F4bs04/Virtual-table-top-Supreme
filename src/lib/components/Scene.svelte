@@ -701,8 +701,8 @@
 
         // GM left-click drag: commit on release (long click or drag)
         if (networkState.draggedPieceId) {
+          const pieceId = networkState.draggedPieceId;
           if (elapsed >= 350 || dist >= 15) {
-            const pieceId = networkState.draggedPieceId;
             const piece = networkState.gameState.pieces[pieceId];
             const startHex = networkState.draggedPieceStartHex;
             if (piece && startHex) {
@@ -723,7 +723,7 @@
             return;
           } else {
             // Short click: cancel drag, keep selection
-            const piece = networkState.gameState.pieces[networkState.draggedPieceId];
+            const piece = networkState.gameState.pieces[pieceId];
             const startHex = networkState.draggedPieceStartHex;
             if (piece && startHex) {
               if (piece.structureType === 'wall-line' && piece.x2 !== undefined) {
@@ -737,6 +737,9 @@
                 piece.x = startHex.c;
                 piece.z = startHex.r;
               }
+              // Set the selected piece
+              networkState.selectedPieceId = pieceId;
+              networkState.addLog(`Selecionado: ${piece.name}`);
             }
             networkState.draggedPieceId = null;
             networkState.draggedPieceStartHex = null;
