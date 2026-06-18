@@ -28,7 +28,7 @@
   let lastTargetX = x;
   let lastTargetY = y;
   let lastTargetZ = z;
-  let animProgress = 1.0;
+  let animProgress = $state(1.0);
   const animDuration = 500; // ms (increased from 400ms for more grace)
   let animStartTime = 0;
 
@@ -65,6 +65,37 @@
   let overlayColor = $state('#dddddd');
   let animationStart = $state(0);
   let animationType = $state(null);
+  let dashElapsed = $state(0);
+  let dashT = $state(0);
+
+  const dashBlink = $derived(animationType === 'dash' && Math.floor(dashElapsed / 50) % 2 === 0);
+
+  const ghost1T = $derived(Math.max(0, animProgress - 0.15));
+  const ghost2T = $derived(Math.max(0, animProgress - 0.3));
+  
+  const ghost1Offset = $derived.by(() => {
+    if (animationType !== 'dash') return { x: 0, z: 0 };
+    const dx = lastTargetX - startX;
+    const dz = lastTargetZ - startZ;
+    const easeG1 = 1 - Math.pow(1 - ghost1T, 3);
+    const easeT = 1 - Math.pow(1 - animProgress, 3);
+    return {
+      x: dx * (easeG1 - easeT),
+      z: dz * (easeG1 - easeT)
+    };
+  });
+
+  const ghost2Offset = $derived.by(() => {
+    if (animationType !== 'dash') return { x: 0, z: 0 };
+    const dx = lastTargetX - startX;
+    const dz = lastTargetZ - startZ;
+    const easeG2 = 1 - Math.pow(1 - ghost2T, 3);
+    const easeT = 1 - Math.pow(1 - animProgress, 3);
+    return {
+      x: dx * (easeG2 - easeT),
+      z: dz * (easeG2 - easeT)
+    };
+  });
 
   // Check if this piece is currently selected locally
   const isSelected = $derived(networkState.selectedPieceId === id);
@@ -82,6 +113,14 @@
   useTask((delta) => {
     if (meshRef && camera.current) {
       meshRef.quaternion.copy(camera.current.quaternion);
+    }
+
+    if (animationType === 'dash') {
+      dashElapsed = Date.now() - animationStart;
+      dashT = Math.min(1.0, dashElapsed / 400);
+    } else {
+      dashElapsed = 0;
+      dashT = 0;
     }
 
     const isDragging = networkState.draggedPieceId === id;
@@ -380,6 +419,7 @@
   <!-- Interactive Billboard Group -->
   <T.Group bind:ref={meshRef}>
     {#if activeTexture}
+      <!-- Main Mesh -->
       <T.Mesh 
         scale={[(isHovered ? 1.4 : 1.2) * scale, (isHovered ? 1.4 : 1.2) * scale, 1]}
         position={[0, (0.6 + visualY) * scale, 0]}
@@ -394,10 +434,46 @@
           color={overlayColor}
           transparent={true}
           alphaTest={currentAlphaTest}
-          opacity={opacityMultiplier}
+          opacity={opacityMultiplier * (dashBlink ? 0.25 : 1.0)}
           side={THREE.DoubleSide}
         />
       </T.Mesh>
+
+      <!-- Ghost 1 (Afterimage) -->
+      {#if animationType === 'dash' && animProgress < 0.95 && animProgress > 0.05}
+        <T.Mesh 
+          scale={[1.2 * scale, 1.2 * scale, 1]}
+          position={[ghost1Offset.x, 0.6 * scale, ghost1Offset.z]}
+        >
+          <T.PlaneGeometry args={[1, 1]} />
+          <T.MeshBasicMaterial 
+            map={activeTexture}
+            color="#22d3ee"
+            transparent={true}
+            alphaTest={currentAlphaTest}
+            opacity={opacityMultiplier * 0.45 * (1.0 - animProgress)}
+            side={THREE.DoubleSide}
+          />
+        </T.Mesh>
+      {/if}
+
+      <!-- Ghost 2 (Afterimage) -->
+      {#if animationType === 'dash' && animProgress < 0.85 && animProgress > 0.15}
+        <T.Mesh 
+          scale={[1.2 * scale, 1.2 * scale, 1]}
+          position={[ghost2Offset.x, 0.6 * scale, ghost2Offset.z]}
+        >
+          <T.PlaneGeometry args={[1, 1]} />
+          <T.MeshBasicMaterial 
+            map={activeTexture}
+            color="#a855f7"
+            transparent={true}
+            alphaTest={currentAlphaTest}
+            opacity={opacityMultiplier * 0.25 * (1.0 - animProgress)}
+            side={THREE.DoubleSide}
+          />
+        </T.Mesh>
+      {/if}
     {/if}
 
     <!-- Status Icons hovering above character token -->
