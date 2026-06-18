@@ -195,13 +195,17 @@
     }
   }
 
+  function handleClick(e) {
+    e.stopPropagation();
+  }
+
   function yCenter(type) {
     if (type === 'sphere') return h / 2;
     return h / 2;
   }
 </script>
 
-<T.Group position={[x, y, z]} rotation={[0, rotation, 0]} userData={{ pieceId: id, pieceClass: 'objeto' }}>
+<T.Group position={[x, y, z]} rotation={[0, rotation, 0]} onclick={handleClick} userData={{ pieceId: id, pieceClass: 'objeto' }}>
   {#if shapeType === 'imported'}
     <T.Group bind:ref={groupRef} userData={{ pieceId: id, pieceClass: 'objeto' }}>
       {#if !modelScene && !loadError}

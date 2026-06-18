@@ -531,24 +531,24 @@
                 <label class="prop-label">Largura (X)</label>
                 <div class="prop-input-row">
                   <input
-                    type="range" min="0.5" max="24" step="0.5"
+                    type="range" min="0.05" max="24" step="0.05"
                     value={piece.width ?? 2}
                     oninput={(e) => updateStructureProp('width', e.target.value)}
                     class="prop-slider"
                   />
-                  <span class="prop-val">{(piece.width ?? 2).toFixed(1)}</span>
+                  <span class="prop-val">{(piece.width ?? 2).toFixed(2)}</span>
                 </div>
               </div>
               <div class="prop-row">
                 <label class="prop-label">Profundidade (Z)</label>
                 <div class="prop-input-row">
                   <input
-                    type="range" min="0.5" max="24" step="0.5"
+                    type="range" min="0.05" max="24" step="0.05"
                     value={piece.depth ?? 2}
                     oninput={(e) => updateStructureProp('depth', e.target.value)}
                     class="prop-slider"
                   />
-                  <span class="prop-val">{(piece.depth ?? 2).toFixed(1)}</span>
+                  <span class="prop-val">{(piece.depth ?? 2).toFixed(2)}</span>
                 </div>
               </div>
               <div class="prop-row">
@@ -561,6 +561,18 @@
                     class="prop-slider"
                   />
                   <span class="prop-val">{(piece.height ?? 2).toFixed(1)}</span>
+                </div>
+              </div>
+              <div class="prop-row">
+                <label class="prop-label">Rotação</label>
+                <div class="prop-input-row">
+                  <input
+                    type="range" min="0" max="360" step="5"
+                    value={Math.round(((piece.rotation ?? 0) * 180) / Math.PI) % 360}
+                    oninput={(e) => updateStructureProp('rotation', (Number(e.target.value) * Math.PI) / 180)}
+                    class="prop-slider"
+                  />
+                  <span class="prop-val">{Math.round(((piece.rotation ?? 0) * 180) / Math.PI) % 360}°</span>
                 </div>
               </div>
             {/if}
