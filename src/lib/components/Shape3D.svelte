@@ -313,13 +313,15 @@
         <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.8} metalness={0.1} />
       </T.Mesh>
     {/each}
-    <T.Mesh position={[0, h * 0.5, 0]}
-      onpointerdown={handlePointerDown}
-      userData={{ pieceId: id, pieceClass: 'objeto' }}
-    >
-      <T.BoxGeometry args={[w + 0.02, h + 0.02, d + 0.02]} />
-      <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.15} />
-    </T.Mesh>
+    {#if networkState.activeTool === 'move'}
+      <T.Mesh position={[0, h * 0.5, 0]}
+        onpointerdown={handlePointerDown}
+        userData={{ pieceId: id, pieceClass: 'objeto' }}
+      >
+        <T.BoxGeometry args={[w + 0.02, h + 0.02, d + 0.02]} />
+        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.15} />
+      </T.Mesh>
+    {/if}
 
   {:else if shapeType === 'box'}
     <T.Mesh position={[0, h * 0.5, 0]}
@@ -329,13 +331,15 @@
       <T.BoxGeometry args={[w, h, d]} />
       <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} />
     </T.Mesh>
-    <T.Mesh position={[0, h * 0.5, 0]}
-      onpointerdown={handlePointerDown}
-      userData={{ pieceId: id, pieceClass: 'objeto' }}
-    >
-      <T.BoxGeometry args={[w + 0.02, h + 0.02, d + 0.02]} />
-      <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2} />
-    </T.Mesh>
+    {#if networkState.activeTool === 'move'}
+      <T.Mesh position={[0, h * 0.5, 0]}
+        onpointerdown={handlePointerDown}
+        userData={{ pieceId: id, pieceClass: 'objeto' }}
+      >
+        <T.BoxGeometry args={[w + 0.02, h + 0.02, d + 0.02]} />
+        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2} />
+      </T.Mesh>
+    {/if}
 
   {:else if shapeType === 'cylinder'}
     <T.Mesh position={[0, h * 0.5, 0]}
@@ -345,13 +349,15 @@
       <T.CylinderGeometry args={[w / 2, w / 2, h, 24]} />
       <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} />
     </T.Mesh>
-    <T.Mesh position={[0, h * 0.5, 0]}
-      onpointerdown={handlePointerDown}
-      userData={{ pieceId: id, pieceClass: 'objeto' }}
-    >
-      <T.CylinderGeometry args={[w / 2 + 0.02, w / 2 + 0.02, h + 0.02, 24]} />
-      <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2} />
-    </T.Mesh>
+    {#if networkState.activeTool === 'move'}
+      <T.Mesh position={[0, h * 0.5, 0]}
+        onpointerdown={handlePointerDown}
+        userData={{ pieceId: id, pieceClass: 'objeto' }}
+      >
+        <T.CylinderGeometry args={[w / 2 + 0.02, w / 2 + 0.02, h + 0.02, 24]} />
+        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2} />
+      </T.Mesh>
+    {/if}
 
   {:else if shapeType === 'sphere'}
     <T.Mesh position={[0, w / 2, 0]}
@@ -361,13 +367,15 @@
       <T.SphereGeometry args={[w / 2, 24, 24]} />
       <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} />
     </T.Mesh>
-    <T.Mesh position={[0, w / 2, 0]}
-      onpointerdown={handlePointerDown}
-      userData={{ pieceId: id, pieceClass: 'objeto' }}
-    >
-      <T.SphereGeometry args={[w / 2 + 0.02, 24, 24]} />
-      <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2} />
-    </T.Mesh>
+    {#if networkState.activeTool === 'move'}
+      <T.Mesh position={[0, w / 2, 0]}
+        onpointerdown={handlePointerDown}
+        userData={{ pieceId: id, pieceClass: 'objeto' }}
+      >
+        <T.SphereGeometry args={[w / 2 + 0.02, 24, 24]} />
+        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2} />
+      </T.Mesh>
+    {/if}
 
   {:else if shapeType === 'pyramid'}
     <T.Mesh position={[0, h * 0.5, 0]}
@@ -377,13 +385,15 @@
       <T.ConeGeometry args={[w / 2, h, 4]} />
       <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} />
     </T.Mesh>
-    <T.Mesh position={[0, h * 0.5, 0]}
-      onpointerdown={handlePointerDown}
-      userData={{ pieceId: id, pieceClass: 'objeto' }}
-    >
-      <T.ConeGeometry args={[w / 2 + 0.02, h + 0.02, 4]} />
-      <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2} />
-    </T.Mesh>
+    {#if networkState.activeTool === 'move'}
+      <T.Mesh position={[0, h * 0.5, 0]}
+        onpointerdown={handlePointerDown}
+        userData={{ pieceId: id, pieceClass: 'objeto' }}
+      >
+        <T.ConeGeometry args={[w / 2 + 0.02, h + 0.02, 4]} />
+        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2} />
+      </T.Mesh>
+    {/if}
 
   {:else if shapeType === 'stairs'}
     <T.Group position={[0, 0, 0]}>
@@ -399,13 +409,15 @@
           <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} />
         </T.Mesh>
       {/each}
-      <T.Mesh position={[0, h * 0.5, 0]}
-        onpointerdown={handlePointerDown}
-        userData={{ pieceId: id, pieceClass: 'objeto' }}
-      >
-        <T.BoxGeometry args={[w + 0.02, h + 0.02, d + 0.02]} />
-        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2} />
-      </T.Mesh>
+      {#if networkState.activeTool === 'move'}
+        <T.Mesh position={[0, h * 0.5, 0]}
+          onpointerdown={handlePointerDown}
+          userData={{ pieceId: id, pieceClass: 'objeto' }}
+        >
+          <T.BoxGeometry args={[w + 0.02, h + 0.02, d + 0.02]} />
+          <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2} />
+        </T.Mesh>
+      {/if}
     </T.Group>
 
   {:else if shapeType === 'round-roof'}
@@ -416,13 +428,15 @@
       <T.ConeGeometry args={[w / 2, h, 24]} />
       <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} />
     </T.Mesh>
-    <T.Mesh position={[0, h * 0.5, 0]}
-      onpointerdown={handlePointerDown}
-      userData={{ pieceId: id, pieceClass: 'objeto' }}
-    >
-      <T.ConeGeometry args={[w / 2 + 0.02, h + 0.02, 24]} />
-      <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2} />
-    </T.Mesh>
+    {#if networkState.activeTool === 'move'}
+      <T.Mesh position={[0, h * 0.5, 0]}
+        onpointerdown={handlePointerDown}
+        userData={{ pieceId: id, pieceClass: 'objeto' }}
+      >
+        <T.ConeGeometry args={[w / 2 + 0.02, h + 0.02, 24]} />
+        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2} />
+      </T.Mesh>
+    {/if}
 
   {:else if shapeType === 'roof'}
     <T.Mesh position={[0, h * 0.5, 0]}
@@ -432,13 +446,15 @@
     >
       <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} />
     </T.Mesh>
-    <T.Mesh position={[0, h * 0.5, 0]}
-      geometry={roofGeometry}
-      onpointerdown={handlePointerDown}
-      userData={{ pieceId: id, pieceClass: 'objeto' }}
-    >
-      <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2} />
-    </T.Mesh>
+    {#if networkState.activeTool === 'move'}
+      <T.Mesh position={[0, h * 0.5, 0]}
+        geometry={roofGeometry}
+        onpointerdown={handlePointerDown}
+        userData={{ pieceId: id, pieceClass: 'objeto' }}
+      >
+        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2} />
+      </T.Mesh>
+    {/if}
   {/if}
 
   <!-- Move/Rotate Gizmo for Host (GM) -->
