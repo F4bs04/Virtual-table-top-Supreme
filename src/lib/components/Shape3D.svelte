@@ -237,6 +237,31 @@
     window.removeEventListener('pointerup', handleWindowTransZEnd);
   });
 
+  const floorHeight = 2.0;
+  const tokenFloor = $derived(Math.round(y / floorHeight) + 1);
+  const opacityMultiplier = $derived.by(() => {
+    const diff = networkState.currentViewLevel - tokenFloor;
+    if (diff === 0) return 1.0;
+    if (diff > 0) return 0.35;
+    return 0.0;
+  });
+  const isVisible = $derived(opacityMultiplier > 0.05);
+
+  // Adjust opacity for imported GLTF model meshes
+  $effect(() => {
+    if (modelScene) {
+      modelScene.traverse((child) => {
+        if (child.isMesh && child.material) {
+          child.material.transparent = opacityMultiplier < 0.95;
+          child.material.opacity = (child.userData.originalOpacity !== undefined ? child.userData.originalOpacity : 1.0) * opacityMultiplier;
+          if (child.userData.originalOpacity === undefined) {
+            child.userData.originalOpacity = child.material.opacity ?? 1.0;
+          }
+        }
+      });
+    }
+  });
+
   const w = $derived(width || 1);
   const d = $derived(depth || 1);
   const h = $derived(height || 1);
@@ -347,18 +372,18 @@
   }
 </script>
 
-<T.Group position={[x, y, z]} rotation={[0, rotation, 0]} onclick={handleClick} userData={{ pieceId: id, pieceClass: 'objeto' }}>
+<T.Group position={[x, y, z]} rotation={[0, rotation, 0]} onclick={handleClick} userData={{ pieceId: id, pieceClass: 'objeto' }} visible={isVisible}>
   {#if shapeType === 'imported'}
     <T.Group bind:ref={groupRef} userData={{ pieceId: id, pieceClass: 'objeto' }}>
       {#if !modelScene && !loadError}
         <T.Mesh position={[0, 0.15, 0]}>
           <T.BoxGeometry args={[0.3, 0.3, 0.3]} />
-          <T.MeshBasicMaterial color={color} transparent opacity={0.3} />
+          <T.MeshBasicMaterial color={color} transparent opacity={0.3 * opacityMultiplier} />
         </T.Mesh>
       {:else if loadError}
         <T.Mesh position={[0, 0.25, 0]}>
           <T.BoxGeometry args={[0.5, 0.5, 0.5]} />
-          <T.MeshBasicMaterial color="#ef4444" wireframe />
+          <T.MeshBasicMaterial color="#ef4444" wireframe transparent opacity={opacityMultiplier} />
         </T.Mesh>
       {/if}
     </T.Group>
@@ -369,7 +394,7 @@
       userData={{ pieceId: id, pieceClass: 'objeto' }}
     >
       <T.BoxGeometry args={[w, h * 0.75, d]} />
-      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.8} metalness={0.1} />
+      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.8} metalness={0.1} transparent={opacityMultiplier < 0.95} opacity={opacityMultiplier} />
     </T.Mesh>
     {#each battlementsData as b (b.cx)}
       <T.Mesh position={[b.cx, h * 0.875, 0]}
@@ -377,7 +402,7 @@
         userData={{ pieceId: id, pieceClass: 'objeto' }}
       >
         <T.BoxGeometry args={[b.bw, b.bh, d * 0.8]} />
-        <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.8} metalness={0.1} />
+        <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.8} metalness={0.1} transparent={opacityMultiplier < 0.95} opacity={opacityMultiplier} />
       </T.Mesh>
     {/each}
     {#if networkState.activeTool === 'move'}
@@ -386,7 +411,7 @@
         userData={{ pieceId: id, pieceClass: 'objeto' }}
       >
         <T.BoxGeometry args={[w + 0.02, h + 0.02, d + 0.02]} />
-        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.15} />
+        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.15 * opacityMultiplier} />
       </T.Mesh>
     {/if}
 
@@ -396,7 +421,7 @@
       userData={{ pieceId: id, pieceClass: 'objeto' }}
     >
       <T.BoxGeometry args={[w, h, d]} />
-      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} />
+      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={opacityMultiplier < 0.95} opacity={opacityMultiplier} />
     </T.Mesh>
     {#if networkState.activeTool === 'move'}
       <T.Mesh position={[0, h * 0.5, 0]}
@@ -404,7 +429,7 @@
         userData={{ pieceId: id, pieceClass: 'objeto' }}
       >
         <T.BoxGeometry args={[w + 0.02, h + 0.02, d + 0.02]} />
-        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2} />
+        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2 * opacityMultiplier} />
       </T.Mesh>
     {/if}
 
@@ -414,7 +439,7 @@
       userData={{ pieceId: id, pieceClass: 'objeto' }}
     >
       <T.CylinderGeometry args={[w / 2, w / 2, h, 24]} />
-      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} />
+      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={opacityMultiplier < 0.95} opacity={opacityMultiplier} />
     </T.Mesh>
     {#if networkState.activeTool === 'move'}
       <T.Mesh position={[0, h * 0.5, 0]}
@@ -422,7 +447,7 @@
         userData={{ pieceId: id, pieceClass: 'objeto' }}
       >
         <T.CylinderGeometry args={[w / 2 + 0.02, w / 2 + 0.02, h + 0.02, 24]} />
-        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2} />
+        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2 * opacityMultiplier} />
       </T.Mesh>
     {/if}
 
@@ -432,7 +457,7 @@
       userData={{ pieceId: id, pieceClass: 'objeto' }}
     >
       <T.SphereGeometry args={[w / 2, 24, 24]} />
-      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} />
+      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={opacityMultiplier < 0.95} opacity={opacityMultiplier} />
     </T.Mesh>
     {#if networkState.activeTool === 'move'}
       <T.Mesh position={[0, w / 2, 0]}
@@ -440,7 +465,7 @@
         userData={{ pieceId: id, pieceClass: 'objeto' }}
       >
         <T.SphereGeometry args={[w / 2 + 0.02, 24, 24]} />
-        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2} />
+        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2 * opacityMultiplier} />
       </T.Mesh>
     {/if}
 
@@ -450,7 +475,7 @@
       userData={{ pieceId: id, pieceClass: 'objeto' }}
     >
       <T.ConeGeometry args={[w / 2, h, 4]} />
-      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} />
+      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={opacityMultiplier < 0.95} opacity={opacityMultiplier} />
     </T.Mesh>
     {#if networkState.activeTool === 'move'}
       <T.Mesh position={[0, h * 0.5, 0]}
@@ -458,7 +483,7 @@
         userData={{ pieceId: id, pieceClass: 'objeto' }}
       >
         <T.ConeGeometry args={[w / 2 + 0.02, h + 0.02, 4]} />
-        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2} />
+        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2 * opacityMultiplier} />
       </T.Mesh>
     {/if}
 
@@ -473,7 +498,7 @@
           userData={{ pieceId: id, pieceClass: 'objeto' }}
         >
           <T.BoxGeometry args={[w, stepHeight, stepDepth * (5 - i)]} />
-          <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} />
+          <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={opacityMultiplier < 0.95} opacity={opacityMultiplier} />
         </T.Mesh>
       {/each}
       {#if networkState.activeTool === 'move'}
@@ -482,7 +507,7 @@
           userData={{ pieceId: id, pieceClass: 'objeto' }}
         >
           <T.BoxGeometry args={[w + 0.02, h + 0.02, d + 0.02]} />
-          <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2} />
+          <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2 * opacityMultiplier} />
         </T.Mesh>
       {/if}
     </T.Group>
@@ -493,7 +518,7 @@
       userData={{ pieceId: id, pieceClass: 'objeto' }}
     >
       <T.ConeGeometry args={[w / 2, h, 24]} />
-      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} />
+      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={opacityMultiplier < 0.95} opacity={opacityMultiplier} />
     </T.Mesh>
     {#if networkState.activeTool === 'move'}
       <T.Mesh position={[0, h * 0.5, 0]}
@@ -501,7 +526,7 @@
         userData={{ pieceId: id, pieceClass: 'objeto' }}
       >
         <T.ConeGeometry args={[w / 2 + 0.02, h + 0.02, 24]} />
-        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2} />
+        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2 * opacityMultiplier} />
       </T.Mesh>
     {/if}
 
@@ -511,7 +536,7 @@
       onpointerdown={handlePointerDown}
       userData={{ pieceId: id, pieceClass: 'objeto' }}
     >
-      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} />
+      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={opacityMultiplier < 0.95} opacity={opacityMultiplier} />
     </T.Mesh>
     {#if networkState.activeTool === 'move'}
       <T.Mesh position={[0, h * 0.5, 0]}
@@ -519,7 +544,7 @@
         onpointerdown={handlePointerDown}
         userData={{ pieceId: id, pieceClass: 'objeto' }}
       >
-        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2} />
+        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2 * opacityMultiplier} />
       </T.Mesh>
     {/if}
   {/if}

@@ -16,6 +16,28 @@
   import Shape3D from './Shape3D.svelte';
   import * as THREE from 'three';
 
+  const currentRenderEnvId = $derived.by(() => {
+    const selectedPiece = networkState.gameState.pieces[networkState.selectedPieceId];
+    if (selectedPiece && selectedPiece.class === 'personagem' && selectedPiece.environmentId) {
+      return selectedPiece.environmentId;
+    }
+    return networkState.gameState.currentEnvironmentId || 'env-1';
+  });
+
+  const envConfig = $derived(networkState.gameState.environments?.[currentRenderEnvId] || {
+    theme: 'soul-society',
+    backgroundImage: '/mapa.jpeg',
+    backgroundImageOpacity: 1.0
+  });
+
+  const renderedPieces = $derived.by(() => {
+    const chars = Object.values(networkState.gameState.pieces || {}).filter(
+      p => p.class === 'personagem' && (p.environmentId || 'env-1') === currentRenderEnvId
+    );
+    const objs = Object.values(envConfig.pieces || {});
+    return [...chars, ...objs];
+  });
+
   // Initialize Threlte interactivity plugin inside Canvas hierarchy
   interactivity();
 
@@ -63,31 +85,31 @@
 
   // Theme-derived lighting colors
   const ambientColor = $derived.by(() => {
-    const theme = networkState.gameState.theme || 'soul-society';
+    const theme = envConfig.theme || 'soul-society';
     if (theme === 'hueco-mundo') return '#0f1d24'; // Cold cyan
     if (theme === 'karakura-town') return '#24120a'; // Warm sunset orange/amber
     return '#1e1b4b'; // Deep purple-blue
   });
 
   const ambientIntensity = $derived.by(() => {
-    const theme = networkState.gameState.theme || 'soul-society';
+    const theme = envConfig.theme || 'soul-society';
     if (theme === 'hueco-mundo') return 1.8;
     if (theme === 'karakura-town') return 1.6;
     return 1.5;
   });
 
   const directionalColor = $derived.by(() => {
-    const theme = networkState.gameState.theme || 'soul-society';
-    if (theme === 'hueco-mundo') return '#ccfbf1'; // Light cyan-blue
-    if (theme === 'karakura-town') return '#ffedd5'; // Light orange-yellow
-    return '#e0f2fe'; // Light sky blue
+    const theme = envConfig.theme || 'soul-society';
+    if (theme === 'hueco-mundo') return '#8b5cf6'; // Violet directional light
+    if (theme === 'karakura-town') return '#f97316'; // Sunset orange
+    return '#38bdf8'; // Sky blue
   });
 
   const gridColor = $derived.by(() => {
-    const theme = networkState.gameState.theme || 'soul-society';
-    if (theme === 'hueco-mundo') return '#06b6d4'; // Teal
-    if (theme === 'karakura-town') return '#f97316'; // Orange
-    return '#a855f7'; // Purple
+    const theme = envConfig.theme || 'soul-society';
+    if (theme === 'hueco-mundo') return '#c084fc';
+    if (theme === 'karakura-town') return '#fdba74';
+    return '#06b6d4';
   });
 
   // Hex grid line segments calculation
@@ -122,10 +144,10 @@
   const basicPlaneDepth = $derived(zMax * basicPlaneMultiplier);
 
   const basicPlaneColor = $derived.by(() => {
-    const theme = networkState.gameState.theme || 'soul-society';
-    if (theme === 'hueco-mundo') return '#07161b';
-    if (theme === 'karakura-town') return '#1c0c02';
-    return '#120b24'; // soul-society
+    const theme = envConfig.theme || 'soul-society';
+    if (theme === 'hueco-mundo') return '#1e1b4b';
+    if (theme === 'karakura-town') return '#0f172a';
+    return '#111827';
   });
 
   let bufferGeometry = $state(null);
@@ -196,7 +218,7 @@
   // Background map texture loader
   let backgroundTexture = $state(null);
   $effect(() => {
-    const bgUrl = networkState.gameState.backgroundImage;
+    const bgUrl = envConfig.backgroundImage;
     if (bgUrl) {
       const loader = new THREE.TextureLoader();
       loader.load(bgUrl, (tex) => {
@@ -1224,14 +1246,14 @@
         map={backgroundTexture} 
         side={THREE.DoubleSide} 
         transparent={true}
-        opacity={networkState.gameState.backgroundImageOpacity ?? 1.0}
+        opacity={envConfig.backgroundImageOpacity ?? 1.0}
       />
     </T.Mesh>
   {/key}
 {/if}
 
 <!-- Chunked 2D background map ground -->
-{#if !networkState.gameState.backgroundImage}
+{#if !envConfig.backgroundImage}
   {#each chunkIndices as chunk (chunk.row + '-' + chunk.col)}
     <MapChunk 
       row={chunk.row} 
@@ -1259,7 +1281,7 @@
 {/key}
 
 <!-- Authoritative pieces sync -->
-{#each Object.values(networkState.gameState.pieces) as piece (piece.id)}
+{#each renderedPieces as piece (piece.id)}
   {@const worldPos = hexToWorld(piece.x, piece.z)}
   {#if piece.structureType === 'house'}
     <Building

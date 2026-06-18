@@ -25,6 +25,55 @@ export const networkState = $state({
   undoStack: [],
   lastAuthoritativeState: null,
 
+  getPiece(pieceId) {
+    if (!networkState.gameState) return null;
+    if (networkState.gameState.pieces && networkState.gameState.pieces[pieceId]) {
+      return networkState.gameState.pieces[pieceId];
+    }
+    const envs = networkState.gameState.environments || {};
+    for (const envId of Object.keys(envs)) {
+      if (envs[envId].pieces && envs[envId].pieces[pieceId]) {
+        return envs[envId].pieces[pieceId];
+      }
+    }
+    return null;
+  },
+
+  setPiece(id, piece) {
+    if (piece.class === 'personagem') {
+      networkState.gameState.pieces[id] = piece;
+    } else {
+      const envId = piece.environmentId || networkState.gameState.currentEnvironmentId || 'env-1';
+      if (!networkState.gameState.environments) {
+        networkState.gameState.environments = {};
+      }
+      if (!networkState.gameState.environments[envId]) {
+        networkState.gameState.environments[envId] = {
+          id: envId,
+          name: envId === 'env-1' ? 'Gotei 13 (Soul Society)' : envId === 'env-2' ? 'Karakura Town' : 'Hueco Mundo',
+          theme: 'soul-society',
+          backgroundImage: '',
+          backgroundImageOpacity: 1.0,
+          pieces: {}
+        };
+      }
+      if (!networkState.gameState.environments[envId].pieces) {
+        networkState.gameState.environments[envId].pieces = {};
+      }
+      networkState.gameState.environments[envId].pieces[id] = piece;
+    }
+  },
+
+  deletePiece(id) {
+    delete networkState.gameState.pieces[id];
+    const envs = networkState.gameState.environments || {};
+    Object.keys(envs).forEach(envId => {
+      if (envs[envId].pieces) {
+        delete envs[envId].pieces[id];
+      }
+    });
+  },
+
   // Authoritative board state
   gameState: {
     buildMode: false,
@@ -270,7 +319,7 @@ export const networkState = $state({
 
     if (data.type === 'INTENT_MOVE') {
       const { pieceId, x, y, z } = data;
-      const piece = networkState.gameState.pieces[pieceId];
+      const piece = networkState.getPiece(pieceId);
 
       if (!piece) {
         networkState.addLog(`Ignored move: Piece ${pieceId} not found.`);
@@ -299,9 +348,9 @@ export const networkState = $state({
           return;
         }
 
-        networkState.gameState.pieces[pieceId].x = x;
-        networkState.gameState.pieces[pieceId].y = y;
-        networkState.gameState.pieces[pieceId].z = z;
+        piece.x = x;
+        piece.y = y;
+        piece.z = z;
         networkState.addLog(`Client ${conn.peer} moved character ${piece.name} to (${x}, ${y}, ${z})`);
         networkState.broadcastGameState();
       } else if (piece.class === 'objeto') {
@@ -396,7 +445,7 @@ export const networkState = $state({
 
   // Move request execution
   requestMove(pieceId, x, y, z) {
-    const piece = networkState.gameState.pieces[pieceId];
+    const piece = networkState.getPiece(pieceId);
     if (!piece) return;
 
     const buildMode = networkState.gameState.buildMode;
@@ -414,9 +463,9 @@ export const networkState = $state({
         }
       }
       
-      networkState.gameState.pieces[pieceId].x = x;
-      networkState.gameState.pieces[pieceId].y = y;
-      networkState.gameState.pieces[pieceId].z = z;
+      piece.x = x;
+      piece.y = y;
+      piece.z = z;
       networkState.addLog(`Host moved ${piece.name} to (${x}, ${y}, ${z})`);
       networkState.broadcastGameState();
     } else if (networkState.role === 'client') {
@@ -574,10 +623,14 @@ export const networkState = $state({
       return;
     }
     const id = `drawn-${Date.now()}`;
+    const envId = networkState.gameState.currentEnvironmentId || 'env-1';
     
     // Auto-stack height: check if there's an existing structure underneath, set base Y on top of it
     let baseHeight = 0;
-    Object.values(networkState.gameState.pieces).forEach(p => {
+    const envPieces = networkState.gameState.environments?.[envId]?.pieces || {};
+    const allPieces = [...Object.values(networkState.gameState.pieces), ...Object.values(envPieces)];
+
+    allPieces.forEach(p => {
       if (p.structureType && Math.abs(p.x - x) < (p.width || 1) && Math.abs(p.z - z) < (p.depth || 1)) {
         const height = p.height || (p.floors ? p.floors * 2.0 : 2.0);
         const topY = p.y + height;
@@ -587,7 +640,7 @@ export const networkState = $state({
       }
     });
 
-    networkState.gameState.pieces[id] = {
+    const newStructure = {
       id,
       name: structureType === 'floor-plane' ? 'Floor Plane' : 'Extruded Wall',
       class: 'objeto',
@@ -605,8 +658,10 @@ export const networkState = $state({
       hp: null,
       maxHp: null,
       notes: '',
-      photos: []
+      photos: [],
+      environmentId: envId
     };
+    networkState.setPiece(id, newStructure);
     networkState.addLog(`Drawn ${structureType} at hex (${x}, ${z}) with size ${width}x${depth} snapped to Y=${baseHeight}`);
     networkState.broadcastGameState();
   },
@@ -667,8 +722,9 @@ export const networkState = $state({
     if (!points || points.length < 3) return;
     const id = `drawn-floor-${Date.now()}`;
     const baseHeight = (networkState.currentViewLevel - 1) * 2.0;
+    const envId = networkState.gameState.currentEnvironmentId || 'env-1';
 
-    networkState.gameState.pieces[id] = {
+    const newFloor = {
       id,
       name: 'Custom Floor Polygon',
       class: 'objeto',
@@ -680,8 +736,10 @@ export const networkState = $state({
       hp: null,
       maxHp: null,
       notes: '',
-      photos: []
+      photos: [],
+      environmentId: envId
     };
+    networkState.setPiece(id, newFloor);
     networkState.addLog(`Created custom floor polygon with ${points.length} vertices at Y=${baseHeight}`);
     networkState.broadcastGameState();
   },
@@ -699,6 +757,7 @@ export const networkState = $state({
     const id = `drawn-wall-${Date.now()}`;
     const baseHeight = (networkState.currentViewLevel - 1) * 2.0;
     const type = networkState.drawingStructureType || 'wall-line';
+    const envId = networkState.gameState.currentEnvironmentId || 'env-1';
 
     const actualType = (type === 'door' || type === 'window') ? 'wall-line' : type;
 
@@ -712,7 +771,7 @@ export const networkState = $state({
       }
     }
 
-    networkState.gameState.pieces[id] = {
+    const newWall = {
       id,
       name: actualType === 'stair' ? 'Stairs' : 'Wall Line',
       class: 'objeto',
@@ -731,8 +790,10 @@ export const networkState = $state({
       hp: null,
       maxHp: null,
       notes: '',
-      photos: []
+      photos: [],
+      environmentId: envId
     };
+    networkState.setPiece(id, newWall);
     networkState.addLog(`Drawn ${actualType} from (${x1}, ${z1}) to (${x2}, ${z2}) at level Y=${baseHeight}`);
     networkState.broadcastGameState();
   },
@@ -1632,7 +1693,9 @@ export const networkState = $state({
     }
     const id = `shape-${Date.now()}`;
     const midPoint = Math.floor((networkState.gameState.gridSize || 24) / 2);
-    networkState.gameState.pieces[id] = {
+    const envId = networkState.gameState.currentEnvironmentId || 'env-1';
+
+    const newShape = {
       id,
       name,
       class: 'objeto',
@@ -1650,8 +1713,10 @@ export const networkState = $state({
       hp: null,
       maxHp: null,
       notes: '',
-      photos: []
+      photos: [],
+      environmentId: envId
     };
+    networkState.setPiece(id, newShape);
     networkState.addLog(`Added 3D shape: ${name} (${shapeType}, size: ${size})`);
     networkState.broadcastGameState();
   },
@@ -1681,7 +1746,9 @@ export const networkState = $state({
 
       const id = `shape-${Date.now()}`;
       const midPoint = Math.floor((networkState.gameState.gridSize || 24) / 2);
-      networkState.gameState.pieces[id] = {
+      const envId = networkState.gameState.currentEnvironmentId || 'env-1';
+
+      const newShape = {
         id,
         name: file.name.replace(/\.[^/.]+$/, ''),
         class: 'objeto',
@@ -1699,8 +1766,10 @@ export const networkState = $state({
         hp: null,
         maxHp: null,
         notes: '',
-        photos: []
+        photos: [],
+        environmentId: envId
       };
+      networkState.setPiece(id, newShape);
       networkState.addLog(`Imported 3D model: ${file.name} (${(dataUrl.length / 1024 / 1024).toFixed(1)}MB)`);
       networkState.broadcastGameState();
     } catch (err) {
