@@ -529,8 +529,17 @@ export const networkState = $state({
     if (typeof updates.color === 'string' && updates.color) {
       piece.color = updates.color;
     }
+    if (typeof updates.x === 'number') {
+      piece.x = updates.x;
+    }
     if (typeof updates.y === 'number') {
       piece.y = updates.y;
+    }
+    if (typeof updates.z === 'number') {
+      piece.z = updates.z;
+    }
+    if (typeof updates.rotation === 'number') {
+      piece.rotation = updates.rotation;
     }
     if (typeof updates.height === 'number') {
       piece.height = updates.height;

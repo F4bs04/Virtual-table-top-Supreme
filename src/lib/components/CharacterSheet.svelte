@@ -577,6 +577,39 @@
               </div>
             {/if}
 
+            {#if canEdit}
+              <div class="prop-row">
+                <label class="prop-label">Posição X</label>
+                <input
+                  type="number"
+                  step="1"
+                  value={piece.x}
+                  oninput={(e) => updateStructureProp('x', e.target.value)}
+                  style="background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 0.25rem 0.5rem; border-radius: 6px; font-family: monospace; outline: none; width: 100%;"
+                />
+              </div>
+              <div class="prop-row">
+                <label class="prop-label">Posição Y (Altura)</label>
+                <input
+                  type="number"
+                  step="0.05"
+                  value={piece.y ?? 0}
+                  oninput={(e) => updateStructureProp('y', e.target.value)}
+                  style="background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 0.25rem 0.5rem; border-radius: 6px; font-family: monospace; outline: none; width: 100%;"
+                />
+              </div>
+              <div class="prop-row">
+                <label class="prop-label">Posição Z</label>
+                <input
+                  type="number"
+                  step="1"
+                  value={piece.z}
+                  oninput={(e) => updateStructureProp('z', e.target.value)}
+                  style="background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 0.25rem 0.5rem; border-radius: 6px; font-family: monospace; outline: none; width: 100%;"
+                />
+              </div>
+            {/if}
+
             <div class="prop-row">
               <label class="prop-label">Andar</label>
               <select
