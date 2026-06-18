@@ -17,6 +17,7 @@
     shapeType = 'box',
     modelUrl = '',
     textureUrl = '',
+    textureRepeat = 1,
     rotation = 0,
     isObstructing = false
   } = $props();
@@ -391,6 +392,8 @@
         textureUrl,
         (tex) => {
           tex.colorSpace = THREE.SRGBColorSpace;
+          tex.wrapS = THREE.RepeatWrapping;
+          tex.wrapT = THREE.RepeatWrapping;
           textureMap = tex;
         },
         undefined,
@@ -398,6 +401,15 @@
       );
     } else {
       textureMap = null;
+    }
+  });
+
+  // Texture repeat update
+  $effect(() => {
+    if (textureMap) {
+      const rep = Number(textureRepeat) || 1;
+      textureMap.repeat.set(rep, rep);
+      textureMap.needsUpdate = true;
     }
   });
 

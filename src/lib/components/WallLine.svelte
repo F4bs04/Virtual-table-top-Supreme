@@ -18,7 +18,8 @@
     thickness = 0.15,
     openings = [],
     isObstructing = false,
-    textureUrl = ''
+    textureUrl = '',
+    textureRepeat = 1
   } = $props();
 
   let activeTexture = $state(null);
@@ -110,7 +111,8 @@
           tex.colorSpace = THREE.SRGBColorSpace;
           tex.wrapS = THREE.RepeatWrapping;
           tex.wrapT = THREE.RepeatWrapping;
-          tex.repeat.set(length, height);
+          const rep = Number(textureRepeat) || 1;
+          tex.repeat.set(length * rep, height * rep);
           activeTexture = tex;
         },
         undefined,
@@ -127,7 +129,8 @@
   // Reactively scale texture repeat on dimension changes
   $effect(() => {
     if (activeTexture) {
-      activeTexture.repeat.set(length, height);
+      const rep = Number(textureRepeat) || 1;
+      activeTexture.repeat.set(length * rep, height * rep);
       activeTexture.needsUpdate = true;
     }
   });

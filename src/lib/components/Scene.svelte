@@ -1309,6 +1309,7 @@
       height={piece.height}
       isObstructing={networkState.obstructedStructureIds.has(piece.id)}
       textureUrl={piece.textureUrl}
+      textureRepeat={piece.textureRepeat}
     />
   {:else if piece.structureType === 'wall-line'}
     <WallLine
@@ -1325,6 +1326,7 @@
       openings={piece.openings}
       isObstructing={networkState.obstructedStructureIds.has(piece.id)}
       textureUrl={piece.textureUrl}
+      textureRepeat={piece.textureRepeat}
     />
   {:else if piece.structureType === 'door'}
     <Door
@@ -1375,6 +1377,7 @@
       depth={piece.depth * Math.sqrt(3) / 2}
       color={piece.color}
       textureUrl={piece.textureUrl}
+      textureRepeat={piece.textureRepeat}
       points={piece.points}
     />
   {:else if piece.structureType === '3d-shape'}
@@ -1390,6 +1393,7 @@
       shapeType={piece.shapeType || 'box'}
       modelUrl={piece.modelUrl || ''}
       textureUrl={piece.textureUrl || ''}
+      textureRepeat={piece.textureRepeat}
       rotation={piece.rotation || 0}
       isObstructing={networkState.obstructedStructureIds.has(piece.id)}
     />

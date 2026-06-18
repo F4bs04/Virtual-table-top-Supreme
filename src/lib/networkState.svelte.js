@@ -606,6 +606,9 @@ export const networkState = $state({
     if (typeof updates.textureUrl === 'string') {
       piece.textureUrl = updates.textureUrl;
     }
+    if (typeof updates.textureRepeat === 'number') {
+      piece.textureRepeat = updates.textureRepeat;
+    }
     if (typeof updates.scale === 'number') {
       piece.scale = updates.scale;
     }

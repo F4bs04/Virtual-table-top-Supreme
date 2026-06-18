@@ -7,7 +7,9 @@
   const standardTextures = [
     { name: 'Black Brick', path: '/Model/textures/Black_brick.png' },
     { name: 'Brick Texture', path: '/Model/textures/Bricktexture.png' },
-    { name: 'Gray Brick', path: '/Model/textures/Bricktexture_gray.png' }
+    { name: 'Gray Brick', path: '/Model/textures/Bricktexture_gray.png' },
+    { name: 'Concrete', path: '/Model/textures/concrete.png' },
+    { name: 'Wood Floor', path: '/Model/textures/wood_floor.png' }
   ];
 
   const bleachCollection = [
@@ -79,6 +81,17 @@
 
   // Local notes state (editable, flushed on blur)
   let localNotes = $state('');
+  let lastPieceId = $state(null);
+
+  $effect(() => {
+    const currentId = piece?.id ?? null;
+    if (currentId !== lastPieceId) {
+      showTexturePopup = false;
+      showBleachPopup = false;
+      lastPieceId = currentId;
+    }
+  });
+
   $effect(() => {
     if (piece) localNotes = piece.notes ?? '';
   });
@@ -689,6 +702,23 @@
                 </button>
               </div>
             </div>
+
+            {#if piece.textureUrl}
+              <div class="prop-row">
+                <label class="prop-label">Repetição</label>
+                <div class="prop-input-row">
+                  <input
+                    type="range" min="0.1" max="10" step="0.1"
+                    value={piece.textureRepeat ?? 1.0}
+                    oninput={(e) => {
+                      networkState.updatePieceDetails(piece.id, { textureRepeat: Number(e.target.value) });
+                    }}
+                    class="prop-slider"
+                  />
+                  <span class="prop-val">{(piece.textureRepeat ?? 1.0).toFixed(1)}x</span>
+                </div>
+              </div>
+            {/if}
           </div>
         </section>
       {/if}

@@ -15,6 +15,7 @@
     depth = 4,
     color = '#a855f7',
     textureUrl = '',
+    textureRepeat = 1,
     points = null
   } = $props();
 
@@ -44,7 +45,8 @@
           tex.colorSpace = THREE.SRGBColorSpace;
           tex.wrapS = THREE.RepeatWrapping;
           tex.wrapT = THREE.RepeatWrapping;
-          tex.repeat.set(width / 2, depth / 2);
+          const rep = Number(textureRepeat) || 1;
+          tex.repeat.set((width / 2) * rep, (depth / 2) * rep);
           activeTexture = tex;
         },
         undefined,
@@ -63,7 +65,8 @@
     if (activeTexture) {
       const w = points ? bounds.width : width;
       const d = points ? bounds.depth : depth;
-      activeTexture.repeat.set(w / 2, d / 2);
+      const rep = Number(textureRepeat) || 1;
+      activeTexture.repeat.set((w / 2) * rep, (d / 2) * rep);
       activeTexture.needsUpdate = true;
     }
   });

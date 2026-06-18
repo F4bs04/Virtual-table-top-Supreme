@@ -19,7 +19,8 @@
     activeFloor = 1,
     height, // custom extrusion height
     isObstructing = false, // camera raycast occlusion state
-    textureUrl = ''
+    textureUrl = '',
+    textureRepeat = 1
   } = $props();
 
   let isHovered = $state(false);
@@ -41,7 +42,8 @@
           tex.colorSpace = THREE.SRGBColorSpace;
           tex.wrapS = THREE.RepeatWrapping;
           tex.wrapT = THREE.RepeatWrapping;
-          tex.repeat.set(width, buildingHeight);
+          const rep = Number(textureRepeat) || 1;
+          tex.repeat.set(width * rep, buildingHeight * rep);
           activeTexture = tex;
         },
         undefined,
@@ -58,7 +60,8 @@
   // Reactively update texture repeat parameters when dimensions scale
   $effect(() => {
     if (activeTexture) {
-      activeTexture.repeat.set(width, buildingHeight);
+      const rep = Number(textureRepeat) || 1;
+      activeTexture.repeat.set(width * rep, buildingHeight * rep);
       activeTexture.needsUpdate = true;
     }
   });
