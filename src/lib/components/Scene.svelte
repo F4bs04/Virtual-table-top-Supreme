@@ -555,6 +555,11 @@
     }
 
     if (networkState.selectedPieceId !== null) {
+      if (networkState.activeTool === 'move') {
+        tryMoveSelectedToHex(targetX, targetZ);
+        return;
+      }
+
       if (networkState.activeTool === 'hand' || networkState.activeTool === 'select') {
         if (networkState.suppressNextGroundDeselect) {
           networkState.suppressNextGroundDeselect = false;
@@ -720,9 +725,18 @@
             // Short click: cancel drag, keep selection
             const piece = networkState.gameState.pieces[networkState.draggedPieceId];
             const startHex = networkState.draggedPieceStartHex;
-            if (piece && startHex && piece.class === 'personagem') {
-              piece.x = startHex.c;
-              piece.z = startHex.r;
+            if (piece && startHex) {
+              if (piece.structureType === 'wall-line' && piece.x2 !== undefined) {
+                const dx = piece.x2 - piece.x;
+                const dz = piece.z2 - piece.z;
+                piece.x = startHex.c;
+                piece.z = startHex.r;
+                piece.x2 = startHex.c + dx;
+                piece.z2 = startHex.r + dz;
+              } else {
+                piece.x = startHex.c;
+                piece.z = startHex.r;
+              }
             }
             networkState.draggedPieceId = null;
             networkState.draggedPieceStartHex = null;
