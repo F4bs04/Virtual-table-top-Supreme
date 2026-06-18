@@ -1334,6 +1334,7 @@
       shapeType={piece.shapeType || 'box'}
       modelUrl={piece.modelUrl || ''}
       textureUrl={piece.textureUrl || ''}
+      rotation={piece.rotation || 0}
     />
   {:else}
     <Piece

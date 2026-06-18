@@ -15,13 +15,85 @@
     height = 1,
     shapeType = 'box',
     modelUrl = '',
-    textureUrl = ''
+    textureUrl = '',
+    rotation = 0
   } = $props();
 
   let modelScene = $state(null);
   let loadError = $state(false);
   let groupRef = $state(null);
   let textureMap = $state(null);
+
+  // Gizmo States
+  let ringHovered = $state(false);
+  let elevHovered = $state(false);
+  let isRotating = $state(false);
+  let startAngle = 0;
+  let startRotation = 0;
+  let isElevating = $state(false);
+  let startElevPointerY = 0;
+  let startElevY = 0;
+
+  function handleRotateStart(e) {
+    if (networkState.role !== 'host') return;
+    e.stopPropagation();
+    isRotating = true;
+    startRotation = rotation;
+    const centerWorld = new THREE.Vector3(x, y, z);
+    const hitPoint = e.point;
+    if (hitPoint) {
+      startAngle = Math.atan2(hitPoint.x - centerWorld.x, hitPoint.z - centerWorld.z);
+    }
+    networkState.draggedPieceId = id; // disable orbit controls
+    networkState.addLog('Rotacionando objeto...');
+  }
+
+  function handleRotateMove(e) {
+    if (!isRotating) return;
+    e.stopPropagation();
+    const centerWorld = new THREE.Vector3(x, y, z);
+    const hitPoint = e.point;
+    if (hitPoint) {
+      const currentAngle = Math.atan2(hitPoint.x - centerWorld.x, hitPoint.z - centerWorld.z);
+      const delta = currentAngle - startAngle;
+      const newRot = startRotation + delta;
+      networkState.gameState.pieces[id].rotation = newRot;
+    }
+  }
+
+  function handleRotateEnd(e) {
+    if (!isRotating) return;
+    isRotating = false;
+    networkState.draggedPieceId = null;
+    networkState.broadcastGameState();
+    networkState.addLog('Rotação concluída.');
+  }
+
+  function handleElevStart(e) {
+    if (networkState.role !== 'host') return;
+    e.stopPropagation();
+    isElevating = true;
+    startElevY = y;
+    startElevPointerY = e.clientY;
+    networkState.draggedPieceId = id; // disable orbit controls
+    networkState.addLog('Ajustando altura do objeto...');
+  }
+
+  function handleElevMove(e) {
+    if (!isElevating) return;
+    e.stopPropagation();
+    const deltaY = (startElevPointerY - e.clientY) * 0.05;
+    const newY = Math.max(0, startElevY + deltaY);
+    networkState.gameState.pieces[id].y = newY;
+  }
+
+  function handleElevEnd(e) {
+    if (!isElevating) return;
+    isElevating = false;
+    networkState.draggedPieceId = null;
+    networkState.broadcastGameState();
+    networkState.addLog(`Altura do objeto ajustada para ${y.toFixed(2)}`);
+  }
 
   const w = $derived(width || 1);
   const d = $derived(depth || 1);
@@ -129,7 +201,7 @@
   }
 </script>
 
-<T.Group position={[x, y, z]} userData={{ pieceId: id, pieceClass: 'objeto' }}>
+<T.Group position={[x, y, z]} rotation={[0, rotation, 0]} userData={{ pieceId: id, pieceClass: 'objeto' }}>
   {#if shapeType === 'imported'}
     <T.Group bind:ref={groupRef} userData={{ pieceId: id, pieceClass: 'objeto' }}>
       {#if !modelScene && !loadError}
@@ -288,5 +360,43 @@
     >
       <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2} />
     </T.Mesh>
+  {/if}
+
+  <!-- Move/Rotate Gizmo for Host (GM) -->
+  {#if networkState.activeTool === 'move' && networkState.selectedPieceId === id && networkState.role === 'host'}
+    <!-- Rotation Torus Ring -->
+    <T.Mesh 
+      position={[0, 0.05, 0]} 
+      rotation={[-Math.PI / 2, 0, 0]}
+      onpointerdown={handleRotateStart}
+      onpointermove={handleRotateMove}
+      onpointerup={handleRotateEnd}
+      onpointerover={() => ringHovered = true}
+      onpointerout={() => ringHovered = false}
+    >
+      <T.TorusGeometry args={[Math.max(w, d) * 0.75, 0.06, 8, 32]} />
+      <T.MeshBasicMaterial color={ringHovered ? '#06b6d4' : '#f59e0b'} transparent opacity={0.8} />
+    </T.Mesh>
+
+    <!-- Elevation (Vertical Move) Gizmo Arrow -->
+    <T.Group 
+      position={[0, h + 0.2, 0]}
+      onpointerdown={handleElevStart}
+      onpointermove={handleElevMove}
+      onpointerup={handleElevEnd}
+      onpointerover={() => elevHovered = true}
+      onpointerout={() => elevHovered = false}
+    >
+      <!-- Shaft -->
+      <T.Mesh>
+        <T.CylinderGeometry args={[0.03, 0.03, 0.4, 8]} />
+        <T.MeshBasicMaterial color={elevHovered ? '#22c55e' : '#10b981'} />
+      </T.Mesh>
+      <!-- Head -->
+      <T.Mesh position={[0, 0.25, 0]}>
+        <T.ConeGeometry args={[0.08, 0.2, 8]} />
+        <T.MeshBasicMaterial color={elevHovered ? '#22c55e' : '#10b981'} />
+      </T.Mesh>
+    </T.Group>
   {/if}
 </T.Group>
