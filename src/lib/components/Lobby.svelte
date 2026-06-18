@@ -51,7 +51,14 @@
     
     const allPieces = [...chars, ...envObjs];
     
+    // Filter duplicates by piece id
+    const uniquePiecesMap = {};
     allPieces.forEach(piece => {
+      uniquePiecesMap[piece.id] = piece;
+    });
+    const uniquePieces = Object.values(uniquePiecesMap);
+    
+    uniquePieces.forEach(piece => {
       const grp = piece.group?.trim() || 'Sem Grupo';
       if (!groups[grp]) {
         groups[grp] = [];
