@@ -27,12 +27,24 @@
   // Gizmo States
   let ringHovered = $state(false);
   let elevHovered = $state(false);
+  let xHovered = $state(false);
+  let zHovered = $state(false);
+
   let isRotating = $state(false);
   let startAngle = 0;
   let startRotation = 0;
+
   let isElevating = $state(false);
   let startElevPointerY = 0;
   let startElevY = 0;
+
+  let isTranslatingX = $state(false);
+  let startXPointerX = 0;
+  let startXVal = 0;
+
+  let isTranslatingZ = $state(false);
+  let startZPointerY = 0;
+  let startZVal = 0;
 
   function handleRotateStart(e) {
     if (networkState.role !== 'host') return;
@@ -63,6 +75,7 @@
 
   function handleRotateEnd(e) {
     if (!isRotating) return;
+    e.stopPropagation();
     isRotating = false;
     networkState.draggedPieceId = null;
     networkState.broadcastGameState();
@@ -89,10 +102,72 @@
 
   function handleElevEnd(e) {
     if (!isElevating) return;
+    e.stopPropagation();
     isElevating = false;
     networkState.draggedPieceId = null;
     networkState.broadcastGameState();
     networkState.addLog(`Altura do objeto ajustada para ${y.toFixed(2)}`);
+  }
+
+  function handleTransXStart(e) {
+    if (networkState.role !== 'host') return;
+    e.stopPropagation();
+    isTranslatingX = true;
+    const piece = networkState.gameState.pieces[id];
+    startXVal = piece.x;
+    startXPointerX = e.clientX;
+    networkState.draggedPieceId = id;
+    networkState.addLog('Movendo objeto no eixo X...');
+  }
+
+  function handleTransXMove(e) {
+    if (!isTranslatingX) return;
+    e.stopPropagation();
+    // Drag ratio: screen space drag delta translated into grid units
+    const deltaX = (e.clientX - startXPointerX) * 0.08;
+    const newX = Math.max(0, Math.min(networkState.gameState.gridSize || 24, startXVal + deltaX));
+    networkState.gameState.pieces[id].x = newX;
+  }
+
+  function handleTransXEnd(e) {
+    if (!isTranslatingX) return;
+    e.stopPropagation();
+    isTranslatingX = false;
+    networkState.draggedPieceId = null;
+    // Snap to nearest integer on grid
+    networkState.gameState.pieces[id].x = Math.round(networkState.gameState.pieces[id].x);
+    networkState.broadcastGameState();
+    networkState.addLog(`Objeto movido para X: ${networkState.gameState.pieces[id].x}`);
+  }
+
+  function handleTransZStart(e) {
+    if (networkState.role !== 'host') return;
+    e.stopPropagation();
+    isTranslatingZ = true;
+    const piece = networkState.gameState.pieces[id];
+    startZVal = piece.z;
+    startZPointerY = e.clientY;
+    networkState.draggedPieceId = id;
+    networkState.addLog('Movendo objeto no eixo Z...');
+  }
+
+  function handleTransZMove(e) {
+    if (!isTranslatingZ) return;
+    e.stopPropagation();
+    const deltaZ = (e.clientY - startZPointerY) * 0.08;
+    const newZ = Math.max(0, Math.min(networkState.gameState.gridSize || 24, startZVal + deltaZ));
+    networkState.gameState.pieces[id].z = newZ;
+  }
+
+  function handleTransZEnd(e) {
+    if (!isTranslatingZ) return;
+    e.stopPropagation();
+    isTranslatingZ = false;
+    networkState.draggedPieceId = null;
+    // Snap to nearest integer on grid
+    networkState.gameState.pieces[id].z = Math.round(networkState.gameState.pieces[id].z);
+    networkState.broadcastGameState();
+    networkState.addLog(`Objeto movido para Z: ${networkState.gameState.pieces[id].z}`);
   }
 
   const w = $derived(width || 1);
@@ -368,39 +443,88 @@
 
   <!-- Move/Rotate Gizmo for Host (GM) -->
   {#if networkState.activeTool === 'move' && networkState.selectedPieceId === id && networkState.role === 'host'}
-    <!-- Rotation Torus Ring -->
-    <T.Mesh 
-      position={[0, 0.05, 0]} 
-      rotation={[-Math.PI / 2, 0, 0]}
-      onpointerdown={handleRotateStart}
-      onpointermove={handleRotateMove}
-      onpointerup={handleRotateEnd}
-      onpointerover={() => ringHovered = true}
-      onpointerout={() => ringHovered = false}
-    >
-      <T.TorusGeometry args={[Math.max(w, d) * 0.75, 0.06, 8, 32]} />
-      <T.MeshBasicMaterial color={ringHovered ? '#06b6d4' : '#f59e0b'} transparent opacity={0.8} />
-    </T.Mesh>
+    <T.Group rotation={[0, -rotation, 0]} onclick={(e) => e.stopPropagation()} onpointerup={(e) => e.stopPropagation()}>
+      
+      <!-- Rotation Torus Ring -->
+      <T.Mesh 
+        position={[0, 0.05, 0]} 
+        rotation={[-Math.PI / 2, 0, 0]}
+        onpointerdown={handleRotateStart}
+        onpointermove={handleRotateMove}
+        onpointerup={handleRotateEnd}
+        onclick={(e) => e.stopPropagation()}
+        onpointerover={() => ringHovered = true}
+        onpointerout={() => ringHovered = false}
+        userData={{ isGizmo: true }}
+      >
+        <T.TorusGeometry args={[Math.max(w, d) * 0.75, 0.06, 8, 32]} />
+        <T.MeshBasicMaterial color={ringHovered ? '#06b6d4' : '#f59e0b'} transparent opacity={0.8} />
+      </T.Mesh>
 
-    <!-- Elevation (Vertical Move) Gizmo Arrow -->
-    <T.Group 
-      position={[0, h + 0.2, 0]}
-      onpointerdown={handleElevStart}
-      onpointermove={handleElevMove}
-      onpointerup={handleElevEnd}
-      onpointerover={() => elevHovered = true}
-      onpointerout={() => elevHovered = false}
-    >
-      <!-- Shaft -->
-      <T.Mesh>
-        <T.CylinderGeometry args={[0.03, 0.03, 0.4, 8]} />
-        <T.MeshBasicMaterial color={elevHovered ? '#22c55e' : '#10b981'} />
-      </T.Mesh>
-      <!-- Head -->
-      <T.Mesh position={[0, 0.25, 0]}>
-        <T.ConeGeometry args={[0.08, 0.2, 8]} />
-        <T.MeshBasicMaterial color={elevHovered ? '#22c55e' : '#10b981'} />
-      </T.Mesh>
+      <!-- Elevation (Vertical Move) Gizmo Arrow (Y Axis) -->
+      <T.Group 
+        position={[0, h + 0.2, 0]}
+        onpointerdown={handleElevStart}
+        onpointermove={handleElevMove}
+        onpointerup={handleElevEnd}
+        onclick={(e) => e.stopPropagation()}
+        onpointerover={() => elevHovered = true}
+        onpointerout={() => elevHovered = false}
+      >
+        <!-- Shaft -->
+        <T.Mesh userData={{ isGizmo: true }}>
+          <T.CylinderGeometry args={[0.03, 0.03, 0.4, 8]} />
+          <T.MeshBasicMaterial color={elevHovered ? '#22c55e' : '#10b981'} />
+        </T.Mesh>
+        <!-- Head -->
+        <T.Mesh position={[0, 0.25, 0]} userData={{ isGizmo: true }}>
+          <T.ConeGeometry args={[0.08, 0.2, 8]} />
+          <T.MeshBasicMaterial color={elevHovered ? '#22c55e' : '#10b981'} />
+        </T.Mesh>
+      </T.Group>
+
+      <!-- Red Translation Arrow (X Axis) -->
+      <T.Group 
+        position={[w * 0.5 + 0.3, 0.05, 0]}
+        rotation={[0, 0, -Math.PI / 2]}
+        onpointerdown={handleTransXStart}
+        onpointermove={handleTransXMove}
+        onpointerup={handleTransXEnd}
+        onclick={(e) => e.stopPropagation()}
+        onpointerover={() => xHovered = true}
+        onpointerout={() => xHovered = false}
+      >
+        <T.Mesh userData={{ isGizmo: true }}>
+          <T.CylinderGeometry args={[0.03, 0.03, 0.4, 8]} />
+          <T.MeshBasicMaterial color={xHovered ? '#ef4444' : '#b91c1c'} />
+        </T.Mesh>
+        <T.Mesh position={[0, 0.25, 0]} userData={{ isGizmo: true }}>
+          <T.ConeGeometry args={[0.08, 0.2, 8]} />
+          <T.MeshBasicMaterial color={xHovered ? '#ef4444' : '#b91c1c'} />
+        </T.Mesh>
+      </T.Group>
+
+      <!-- Blue Translation Arrow (Z Axis) -->
+      <T.Group 
+        position={[0, 0.05, d * 0.5 + 0.3]}
+        rotation={[Math.PI / 2, 0, 0]}
+        onpointerdown={handleTransZStart}
+        onpointermove={handleTransZMove}
+        onpointerup={handleTransZEnd}
+        onclick={(e) => e.stopPropagation()}
+        onpointerover={() => zHovered = true}
+        onpointerout={() => zHovered = false}
+      >
+        <T.Mesh userData={{ isGizmo: true }}>
+          <T.CylinderGeometry args={[0.03, 0.03, 0.4, 8]} />
+          <T.MeshBasicMaterial color={zHovered ? '#3b82f6' : '#1d4ed8'} />
+        </T.Mesh>
+        <T.Mesh position={[0, 0.25, 0]} userData={{ isGizmo: true }}>
+          <T.ConeGeometry args={[0.08, 0.2, 8]} />
+          <T.MeshBasicMaterial color={zHovered ? '#3b82f6' : '#1d4ed8'} />
+        </T.Mesh>
+      </T.Group>
+
     </T.Group>
   {/if}
 </T.Group>

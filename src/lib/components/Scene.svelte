@@ -658,10 +658,17 @@
             scene.traverse((obj) => {
               if (obj.isMesh) {
                 let node = obj;
+                let isGizmo = false;
                 while (node) {
-                  if (node.userData && node.userData.pieceId) {
-                    candidates.push({ mesh: obj, pieceId: node.userData.pieceId, pieceClass: node.userData.pieceClass });
-                    break;
+                  if (node.userData) {
+                    if (node.userData.isGizmo) {
+                      isGizmo = true;
+                      break;
+                    }
+                    if (node.userData.pieceId) {
+                      candidates.push({ mesh: obj, pieceId: node.userData.pieceId, pieceClass: node.userData.pieceClass });
+                      break;
+                    }
                   }
                   node = node.parent;
                 }
@@ -776,14 +783,15 @@
             scene.traverse((obj) => {
               if (obj.isMesh) {
                 let node = obj;
+                let isGizmo = false;
                 while (node) {
                   if (node.userData) {
-                    if (node.userData.pieceId) {
-                      candidates.push({ mesh: obj, pieceId: node.userData.pieceId, pieceClass: node.userData.pieceClass });
+                    if (node.userData.isGizmo) {
+                      isGizmo = true;
                       break;
                     }
-                    if (node.userData.isMovementHex) {
-                      hexCandidates.push({ mesh: obj, hexC: node.userData.hexC, hexR: node.userData.hexR, hexIsDash: node.userData.hexIsDash });
+                    if (node.userData.pieceId) {
+                      candidates.push({ mesh: obj, pieceId: node.userData.pieceId, pieceClass: node.userData.pieceClass });
                       break;
                     }
                   }
