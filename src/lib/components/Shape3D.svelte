@@ -41,6 +41,22 @@
     return positions;
   });
 
+  // Normal roof (triangular prism) geometry
+  const roofGeometry = $derived.by(() => {
+    const shape = new THREE.Shape();
+    shape.moveTo(-w / 2, -h / 2);
+    shape.lineTo(0, h / 2);
+    shape.lineTo(w / 2, -h / 2);
+    shape.closePath();
+
+    const geom = new THREE.ExtrudeGeometry(shape, {
+      depth: d,
+      bevelEnabled: false
+    });
+    geom.center();
+    return geom;
+  });
+
   // Imported model loading
   onMount(() => {
     if (shapeType === 'imported' && modelUrl) {
@@ -215,6 +231,61 @@
       userData={{ pieceId: id, pieceClass: 'objeto' }}
     >
       <T.ConeGeometry args={[w / 2 + 0.02, h + 0.02, 4]} />
+      <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2} />
+    </T.Mesh>
+
+  {:else if shapeType === 'stairs'}
+    <T.Group position={[0, 0, 0]}>
+      {#each Array(5) as _, i}
+        {@const stepHeight = h / 5}
+        {@const stepDepth = d / 5}
+        <T.Mesh 
+          position={[0, stepHeight * (i + 0.5), -d/2 + stepDepth * (i + 0.5)]}
+          onpointerdown={handlePointerDown}
+          userData={{ pieceId: id, pieceClass: 'objeto' }}
+        >
+          <T.BoxGeometry args={[w, stepHeight, stepDepth * (5 - i)]} />
+          <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} />
+        </T.Mesh>
+      {/each}
+      <T.Mesh position={[0, h * 0.5, 0]}
+        onpointerdown={handlePointerDown}
+        userData={{ pieceId: id, pieceClass: 'objeto' }}
+      >
+        <T.BoxGeometry args={[w + 0.02, h + 0.02, d + 0.02]} />
+        <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2} />
+      </T.Mesh>
+    </T.Group>
+
+  {:else if shapeType === 'round-roof'}
+    <T.Mesh position={[0, h * 0.5, 0]}
+      onpointerdown={handlePointerDown}
+      userData={{ pieceId: id, pieceClass: 'objeto' }}
+    >
+      <T.ConeGeometry args={[w / 2, h, 24]} />
+      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} />
+    </T.Mesh>
+    <T.Mesh position={[0, h * 0.5, 0]}
+      onpointerdown={handlePointerDown}
+      userData={{ pieceId: id, pieceClass: 'objeto' }}
+    >
+      <T.ConeGeometry args={[w / 2 + 0.02, h + 0.02, 24]} />
+      <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2} />
+    </T.Mesh>
+
+  {:else if shapeType === 'roof'}
+    <T.Mesh position={[0, h * 0.5, 0]}
+      geometry={roofGeometry}
+      onpointerdown={handlePointerDown}
+      userData={{ pieceId: id, pieceClass: 'objeto' }}
+    >
+      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} />
+    </T.Mesh>
+    <T.Mesh position={[0, h * 0.5, 0]}
+      geometry={roofGeometry}
+      onpointerdown={handlePointerDown}
+      userData={{ pieceId: id, pieceClass: 'objeto' }}
+    >
       <T.MeshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2} />
     </T.Mesh>
   {/if}

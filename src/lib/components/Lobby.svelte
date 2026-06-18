@@ -84,7 +84,8 @@
   function createShape(shapeType) {
     const names = {
       box: 'Box', cylinder: 'Cylinder', sphere: 'Sphere',
-      'castle-wall': 'Castle Wall', pyramid: 'Pyramid'
+      'castle-wall': 'Castle Wall', pyramid: 'Pyramid',
+      stairs: 'Escada', 'round-roof': 'Telhado Redondo', roof: 'Telhado Normal'
     };
     networkState.add3DShape(names[shapeType] || shapeType, shapeType, shapeColor, shapeSize);
   }
@@ -365,7 +366,7 @@
                     <span class="shape-icon">△</span>
                     <strong>Pirâmide</strong>
                   </button>
-                  <button
+                   <button
                     class="shape-card"
                     disabled={!networkState.gameState.buildMode}
                     onclick={() => createShape('castle-wall')}
@@ -373,6 +374,33 @@
                   >
                     <span class="shape-icon">▤</span>
                     <strong>Muro</strong>
+                  </button>
+                  <button
+                    class="shape-card"
+                    disabled={!networkState.gameState.buildMode}
+                    onclick={() => createShape('stairs')}
+                    title="Criar uma escada"
+                  >
+                    <span class="shape-icon">🪜</span>
+                    <strong>Escada</strong>
+                  </button>
+                  <button
+                    class="shape-card"
+                    disabled={!networkState.gameState.buildMode}
+                    onclick={() => createShape('round-roof')}
+                    title="Criar um telhado redondo (cone)"
+                  >
+                    <span class="shape-icon">⛺</span>
+                    <strong>Telhado R.</strong>
+                  </button>
+                  <button
+                    class="shape-card"
+                    disabled={!networkState.gameState.buildMode}
+                    onclick={() => createShape('roof')}
+                    title="Criar um telhado normal (prismático)"
+                  >
+                    <span class="shape-icon">🏠</span>
+                    <strong>Telhado N.</strong>
                   </button>
                   <label
                     class="shape-card import-card"

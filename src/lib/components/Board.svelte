@@ -342,17 +342,17 @@
   {#if networkState.gameState.turnPhase === 'active' && networkState.gameState.turnOrder.length > 0}
     {@const currentEntry = networkState.gameState.turnOrder[networkState.gameState.currentTurnIndex]}
     <div class="turn-indicator" style="position: absolute; bottom: 1rem; right: 1rem; z-index: 5000; pointer-events: none;">
-      <div style="background: rgba(15, 23, 42, 0.92); border: 1.5px solid #f59e0b; border-radius: 12px; padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.65rem; box-shadow: 0 0 20px rgba(245, 158, 11, 0.3); backdrop-filter: blur(8px);">
-        <span style="font-size: 0.65rem; font-weight: 900; color: #f59e0b; text-transform: uppercase; letter-spacing: 0.05rem; font-family: monospace;">Turno</span>
+      <div style="background: rgba(15, 23, 42, 0.94); border: 1.5px solid #f59e0b; border-radius: 12px; padding: 0.75rem; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 15px rgba(245, 158, 11, 0.25); backdrop-filter: blur(10px); min-width: 110px; text-align: center;">
+        <span style="font-size: 0.65rem; font-weight: 900; color: #f59e0b; text-transform: uppercase; letter-spacing: 0.08rem; font-family: monospace;">TURNO</span>
         {#if currentEntry.textureUrl}
-          <img src={currentEntry.textureUrl} alt={currentEntry.name} style="width: 32px; height: 32px; border-radius: 8px; object-fit: cover; border: 2px solid #f59e0b;" />
+          <img src={currentEntry.textureUrl} alt={currentEntry.name} style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid #f59e0b; box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);" />
         {:else}
-          <div style="width: 32px; height: 32px; border-radius: 8px; background: {currentEntry.color}; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 900; color: #fff; border: 2px solid #f59e0b;">
+          <div style="width: 48px; height: 48px; border-radius: 50%; background: {currentEntry.color}; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; font-weight: 900; color: #fff; border: 2px solid #f59e0b; box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);">
             {currentEntry.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
           </div>
         {/if}
-        <div style="display: flex; flex-direction: column;">
-          <strong style="font-size: 0.82rem; color: #fbbf24; line-height: 1.2;">{currentEntry.name}</strong>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 0.15rem;">
+          <strong style="font-size: 0.85rem; color: #fbbf24; line-height: 1.2; word-break: break-word; max-width: 120px; font-weight: 700;">{currentEntry.name}</strong>
           <span style="font-size: 0.6rem; color: #94a3b8; font-family: monospace;">({networkState.gameState.currentTurnIndex + 1}/{networkState.gameState.turnOrder.length})</span>
         </div>
       </div>
