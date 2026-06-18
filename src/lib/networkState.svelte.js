@@ -22,6 +22,8 @@ export const networkState = $state({
   draggedPieceStartHex: null, // { c, r } start hex of the piece before drag for move range validations
   dashMode: false, // true when the player has activated the dash ability and is picking a destination
   moveLockPieceId: null, // GM Move tool: piece ID that is "grabbed" and follows the mouse
+  undoStack: [],
+  lastAuthoritativeState: null,
 
   // Authoritative board state
   gameState: {
@@ -347,11 +349,41 @@ export const networkState = $state({
     }
   },
 
+  // Undo GM action
+  undo() {
+    if (networkState.role !== 'host') return;
+    if (networkState.undoStack.length === 0) {
+      networkState.addLog('Nada para desfazer (Ctrl+Z).');
+      return;
+    }
+    const prevState = networkState.undoStack.pop();
+    networkState.gameState = prevState;
+    networkState.lastAuthoritativeState = $state.snapshot(prevState);
+    networkState.broadcastGameState();
+    networkState.addLog('Ação desfeita (Ctrl+Z).');
+  },
+
   // Broadcast game state to all clients
   broadcastGameState() {
     if (networkState.role !== 'host') return;
     
     const snap = $state.snapshot(networkState.gameState);
+    
+    // Check if we need to initialize lastAuthoritativeState
+    if (!networkState.lastAuthoritativeState) {
+      networkState.lastAuthoritativeState = snap;
+    } else {
+      const snapStr = JSON.stringify(snap);
+      const lastStr = JSON.stringify(networkState.lastAuthoritativeState);
+      if (snapStr !== lastStr) {
+        networkState.undoStack.push(networkState.lastAuthoritativeState);
+        if (networkState.undoStack.length > 50) {
+          networkState.undoStack.shift();
+        }
+        networkState.lastAuthoritativeState = snap;
+      }
+    }
+
     networkState.connections.forEach(conn => {
       if (conn.open) {
         conn.send({

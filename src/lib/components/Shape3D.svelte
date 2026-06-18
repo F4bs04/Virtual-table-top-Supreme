@@ -1,6 +1,6 @@
 <script>
-  import { T } from '@threlte/core';
-  import { onMount } from 'svelte';
+  import { T, useThrelte } from '@threlte/core';
+  import { onMount, onDestroy } from 'svelte';
   import * as THREE from 'three';
   import { networkState } from '../networkState.svelte.js';
 
@@ -40,48 +40,61 @@
 
   let isTranslatingX = $state(false);
   let startXPointerX = 0;
+  let startXPointerY = 0;
   let startXVal = 0;
 
   let isTranslatingZ = $state(false);
+  let startZPointerX = 0;
   let startZPointerY = 0;
   let startZVal = 0;
 
+  const { camera } = useThrelte();
+
+  // Window handlers for rotation (Blender style center pivot)
   function handleRotateStart(e) {
     if (networkState.role !== 'host') return;
     e.stopPropagation();
     isRotating = true;
     startRotation = rotation;
-    const centerWorld = new THREE.Vector3(x, y, z);
-    const hitPoint = e.point;
-    if (hitPoint) {
-      startAngle = Math.atan2(hitPoint.x - centerWorld.x, hitPoint.z - centerWorld.z);
-    }
+    
+    const center3D = new THREE.Vector3(x, y, z);
+    center3D.project(camera.current);
+    const centerX = (center3D.x * 0.5 + 0.5) * window.innerWidth;
+    const centerY = (-(center3D.y * 0.5) + 0.5) * window.innerHeight;
+    
+    startAngle = Math.atan2(e.nativeEvent.clientY - centerY, e.nativeEvent.clientX - centerX);
+    
     networkState.draggedPieceId = id; // disable orbit controls
     networkState.addLog('Rotacionando objeto...');
+
+    window.addEventListener('pointermove', handleWindowRotateMove);
+    window.addEventListener('pointerup', handleWindowRotateEnd);
   }
 
-  function handleRotateMove(e) {
+  function handleWindowRotateMove(e) {
     if (!isRotating) return;
-    e.stopPropagation();
-    const centerWorld = new THREE.Vector3(x, y, z);
-    const hitPoint = e.point;
-    if (hitPoint) {
-      const currentAngle = Math.atan2(hitPoint.x - centerWorld.x, hitPoint.z - centerWorld.z);
-      const delta = currentAngle - startAngle;
-      const newRot = startRotation + delta;
-      networkState.gameState.pieces[id].rotation = newRot;
-    }
+    const center3D = new THREE.Vector3(x, y, z);
+    center3D.project(camera.current);
+    const centerX = (center3D.x * 0.5 + 0.5) * window.innerWidth;
+    const centerY = (-(center3D.y * 0.5) + 0.5) * window.innerHeight;
+    
+    const currentAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX);
+    const delta = currentAngle - startAngle;
+    const newRot = startRotation - delta;
+    networkState.gameState.pieces[id].rotation = newRot;
   }
 
-  function handleRotateEnd(e) {
+  function handleWindowRotateEnd(e) {
     if (!isRotating) return;
-    e.stopPropagation();
     isRotating = false;
     networkState.draggedPieceId = null;
+    window.removeEventListener('pointermove', handleWindowRotateMove);
+    window.removeEventListener('pointerup', handleWindowRotateEnd);
     networkState.broadcastGameState();
     networkState.addLog('Rotação concluída.');
   }
 
+  // Window handlers for elevation (Y Axis)
   function handleElevStart(e) {
     if (networkState.role !== 'host') return;
     e.stopPropagation();
@@ -90,85 +103,139 @@
     startElevPointerY = e.nativeEvent.clientY;
     networkState.draggedPieceId = id; // disable orbit controls
     networkState.addLog('Ajustando altura do objeto...');
+
+    window.addEventListener('pointermove', handleWindowElevMove);
+    window.addEventListener('pointerup', handleWindowElevEnd);
   }
 
-  function handleElevMove(e) {
+  // Vertical movement fix: naturally translates vertical cursor delta
+  function handleWindowElevMove(e) {
     if (!isElevating) return;
-    e.stopPropagation();
-    const deltaY = (startElevPointerY - e.nativeEvent.clientY) * 0.05;
+    const dy = e.clientY - startElevPointerY;
+    const sens = 0.8 / (camera.current?.zoom || 40);
+    const deltaY = -dy * sens;
     const newY = Math.max(0, startElevY + deltaY);
     networkState.gameState.pieces[id].y = newY;
   }
 
-  function handleElevEnd(e) {
+  function handleWindowElevEnd(e) {
     if (!isElevating) return;
-    e.stopPropagation();
     isElevating = false;
     networkState.draggedPieceId = null;
+    window.removeEventListener('pointermove', handleWindowElevMove);
+    window.removeEventListener('pointerup', handleWindowElevEnd);
     networkState.broadcastGameState();
     networkState.addLog(`Altura do objeto ajustada para ${y.toFixed(2)}`);
   }
 
+  // Window handlers for Translation X (Blender style camera space projection)
   function handleTransXStart(e) {
     if (networkState.role !== 'host') return;
     e.stopPropagation();
     isTranslatingX = true;
-    const piece = networkState.gameState.pieces[id];
-    startXVal = piece.x;
+    startXVal = x;
     startXPointerX = e.nativeEvent.clientX;
+    startXPointerY = e.nativeEvent.clientY;
     networkState.draggedPieceId = id;
     networkState.addLog('Movendo objeto no eixo X...');
+
+    window.addEventListener('pointermove', handleWindowTransXMove);
+    window.addEventListener('pointerup', handleWindowTransXEnd);
   }
 
-  function handleTransXMove(e) {
+  function handleWindowTransXMove(e) {
     if (!isTranslatingX) return;
-    e.stopPropagation();
-    // Drag ratio: screen space drag delta translated into grid units
-    const deltaX = (e.nativeEvent.clientX - startXPointerX) * 0.08;
+    const dx = e.clientX - startXPointerX;
+    const dy = e.clientY - startXPointerY;
+    
+    const cameraDir = new THREE.Vector3();
+    camera.current.getWorldDirection(cameraDir);
+    cameraDir.y = 0;
+    cameraDir.normalize();
+
+    const cameraRight = new THREE.Vector3();
+    cameraRight.crossVectors(cameraDir, new THREE.Vector3(0, 1, 0)).normalize();
+
+    const sens = 0.8 / (camera.current?.zoom || 40);
+    const worldDelta = new THREE.Vector3();
+    worldDelta.addScaledVector(cameraRight, dx * sens);
+    worldDelta.addScaledVector(cameraDir, -dy * sens);
+
+    const deltaX = worldDelta.x;
     const newX = Math.max(0, Math.min(networkState.gameState.gridSize || 24, startXVal + deltaX));
     networkState.gameState.pieces[id].x = newX;
   }
 
   function handleTransXEnd(e) {
     if (!isTranslatingX) return;
-    e.stopPropagation();
     isTranslatingX = false;
     networkState.draggedPieceId = null;
-    // Snap to nearest integer on grid
+    window.removeEventListener('pointermove', handleWindowTransXMove);
+    window.removeEventListener('pointerup', handleWindowTransXEnd);
     networkState.gameState.pieces[id].x = Math.round(networkState.gameState.pieces[id].x);
     networkState.broadcastGameState();
     networkState.addLog(`Objeto movido para X: ${networkState.gameState.pieces[id].x}`);
   }
 
+  // Window handlers for Translation Z (Blender style camera space projection)
   function handleTransZStart(e) {
     if (networkState.role !== 'host') return;
     e.stopPropagation();
     isTranslatingZ = true;
-    const piece = networkState.gameState.pieces[id];
-    startZVal = piece.z;
+    startZVal = z;
+    startZPointerX = e.nativeEvent.clientX;
     startZPointerY = e.nativeEvent.clientY;
     networkState.draggedPieceId = id;
     networkState.addLog('Movendo objeto no eixo Z...');
+
+    window.addEventListener('pointermove', handleWindowTransZMove);
+    window.addEventListener('pointerup', handleWindowTransZEnd);
   }
 
-  function handleTransZMove(e) {
+  function handleWindowTransZMove(e) {
     if (!isTranslatingZ) return;
-    e.stopPropagation();
-    const deltaZ = (e.nativeEvent.clientY - startZPointerY) * 0.08;
+    const dx = e.clientX - startZPointerX;
+    const dy = e.clientY - startZPointerY;
+
+    const cameraDir = new THREE.Vector3();
+    camera.current.getWorldDirection(cameraDir);
+    cameraDir.y = 0;
+    cameraDir.normalize();
+
+    const cameraRight = new THREE.Vector3();
+    cameraRight.crossVectors(cameraDir, new THREE.Vector3(0, 1, 0)).normalize();
+
+    const sens = 0.8 / (camera.current?.zoom || 40);
+    const worldDelta = new THREE.Vector3();
+    worldDelta.addScaledVector(cameraRight, dx * sens);
+    worldDelta.addScaledVector(cameraDir, -dy * sens);
+
+    const deltaZ = worldDelta.z;
     const newZ = Math.max(0, Math.min(networkState.gameState.gridSize || 24, startZVal + deltaZ));
     networkState.gameState.pieces[id].z = newZ;
   }
 
   function handleTransZEnd(e) {
     if (!isTranslatingZ) return;
-    e.stopPropagation();
     isTranslatingZ = false;
     networkState.draggedPieceId = null;
-    // Snap to nearest integer on grid
+    window.removeEventListener('pointermove', handleWindowTransZMove);
+    window.removeEventListener('pointerup', handleWindowTransZEnd);
     networkState.gameState.pieces[id].z = Math.round(networkState.gameState.pieces[id].z);
     networkState.broadcastGameState();
     networkState.addLog(`Objeto movido para Z: ${networkState.gameState.pieces[id].z}`);
   }
+
+  onDestroy(() => {
+    window.removeEventListener('pointermove', handleWindowRotateMove);
+    window.removeEventListener('pointerup', handleWindowRotateEnd);
+    window.removeEventListener('pointermove', handleWindowElevMove);
+    window.removeEventListener('pointerup', handleWindowElevEnd);
+    window.removeEventListener('pointermove', handleWindowTransXMove);
+    window.removeEventListener('pointerup', handleWindowTransXEnd);
+    window.removeEventListener('pointermove', handleWindowTransZMove);
+    window.removeEventListener('pointerup', handleWindowTransZEnd);
+  });
 
   const w = $derived(width || 1);
   const d = $derived(depth || 1);
@@ -466,8 +533,6 @@
         position={[0, 0.05, 0]} 
         rotation={[-Math.PI / 2, 0, 0]}
         onpointerdown={handleRotateStart}
-        onpointermove={handleRotateMove}
-        onpointerup={handleRotateEnd}
         onclick={(e) => e.stopPropagation()}
         onpointerover={() => ringHovered = true}
         onpointerout={() => ringHovered = false}
@@ -481,8 +546,6 @@
       <T.Group 
         position={[0, h + 0.2, 0]}
         onpointerdown={handleElevStart}
-        onpointermove={handleElevMove}
-        onpointerup={handleElevEnd}
         onclick={(e) => e.stopPropagation()}
         onpointerover={() => elevHovered = true}
         onpointerout={() => elevHovered = false}
@@ -504,8 +567,6 @@
         position={[w * 0.5 + 0.3, 0.05, 0]}
         rotation={[0, 0, -Math.PI / 2]}
         onpointerdown={handleTransXStart}
-        onpointermove={handleTransXMove}
-        onpointerup={handleTransXEnd}
         onclick={(e) => e.stopPropagation()}
         onpointerover={() => xHovered = true}
         onpointerout={() => xHovered = false}
@@ -525,8 +586,6 @@
         position={[0, 0.05, d * 0.5 + 0.3]}
         rotation={[Math.PI / 2, 0, 0]}
         onpointerdown={handleTransZStart}
-        onpointermove={handleTransZMove}
-        onpointerup={handleTransZEnd}
         onclick={(e) => e.stopPropagation()}
         onpointerover={() => zHovered = true}
         onpointerout={() => zHovered = false}

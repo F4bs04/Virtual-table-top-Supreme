@@ -6,6 +6,15 @@
   // Clear active selection / cancel drawing when Escape is pressed
   $effect(() => {
     function handleKeyDown(e) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
+          return;
+        }
+        e.preventDefault();
+        networkState.undo();
+        return;
+      }
+
       if (e.key === 'Escape') {
         if (networkState.drawingMode) {
           if (networkState.activeTool === 'draw-floor') {
