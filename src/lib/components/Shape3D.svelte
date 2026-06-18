@@ -87,7 +87,7 @@
     e.stopPropagation();
     isElevating = true;
     startElevY = y;
-    startElevPointerY = e.clientY;
+    startElevPointerY = e.nativeEvent.clientY;
     networkState.draggedPieceId = id; // disable orbit controls
     networkState.addLog('Ajustando altura do objeto...');
   }
@@ -95,7 +95,7 @@
   function handleElevMove(e) {
     if (!isElevating) return;
     e.stopPropagation();
-    const deltaY = (startElevPointerY - e.clientY) * 0.05;
+    const deltaY = (startElevPointerY - e.nativeEvent.clientY) * 0.05;
     const newY = Math.max(0, startElevY + deltaY);
     networkState.gameState.pieces[id].y = newY;
   }
@@ -115,7 +115,7 @@
     isTranslatingX = true;
     const piece = networkState.gameState.pieces[id];
     startXVal = piece.x;
-    startXPointerX = e.clientX;
+    startXPointerX = e.nativeEvent.clientX;
     networkState.draggedPieceId = id;
     networkState.addLog('Movendo objeto no eixo X...');
   }
@@ -124,7 +124,7 @@
     if (!isTranslatingX) return;
     e.stopPropagation();
     // Drag ratio: screen space drag delta translated into grid units
-    const deltaX = (e.clientX - startXPointerX) * 0.08;
+    const deltaX = (e.nativeEvent.clientX - startXPointerX) * 0.08;
     const newX = Math.max(0, Math.min(networkState.gameState.gridSize || 24, startXVal + deltaX));
     networkState.gameState.pieces[id].x = newX;
   }
@@ -146,7 +146,7 @@
     isTranslatingZ = true;
     const piece = networkState.gameState.pieces[id];
     startZVal = piece.z;
-    startZPointerY = e.clientY;
+    startZPointerY = e.nativeEvent.clientY;
     networkState.draggedPieceId = id;
     networkState.addLog('Movendo objeto no eixo Z...');
   }
@@ -154,7 +154,7 @@
   function handleTransZMove(e) {
     if (!isTranslatingZ) return;
     e.stopPropagation();
-    const deltaZ = (e.clientY - startZPointerY) * 0.08;
+    const deltaZ = (e.nativeEvent.clientY - startZPointerY) * 0.08;
     const newZ = Math.max(0, Math.min(networkState.gameState.gridSize || 24, startZVal + deltaZ));
     networkState.gameState.pieces[id].z = newZ;
   }
