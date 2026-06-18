@@ -655,14 +655,14 @@
             );
             raycaster.setFromCamera(mouse, camera.current);
             const candidates = [];
+            const gizmoMeshes = [];
             scene.traverse((obj) => {
               if (obj.isMesh) {
                 let node = obj;
-                let isGizmo = false;
                 while (node) {
                   if (node.userData) {
                     if (node.userData.isGizmo) {
-                      isGizmo = true;
+                      gizmoMeshes.push(obj);
                       break;
                     }
                     if (node.userData.pieceId) {
@@ -674,10 +674,17 @@
                 }
               }
             });
-            const meshList = candidates.map(c => c.mesh);
-            const intersects = raycaster.intersectObjects(meshList, false);
+            const targetMeshes = [
+              ...gizmoMeshes,
+              ...candidates.map(c => c.mesh)
+            ];
+            const intersects = raycaster.intersectObjects(targetMeshes, false);
             if (intersects.length > 0) {
               const hitMesh = intersects[0].object;
+              if (gizmoMeshes.includes(hitMesh)) {
+                console.log('[DEBUG] handleGlobalPointerDown: Intersected gizmo first, ignoring drag initiation.');
+                return;
+              }
               const found = candidates.find(c => c.mesh === hitMesh);
               if (found) {
                 const piece = networkState.gameState.pieces[found.pieceId];
@@ -780,18 +787,22 @@
 
             const candidates = [];
             const hexCandidates = [];
+            const gizmoMeshes = [];
             scene.traverse((obj) => {
               if (obj.isMesh) {
                 let node = obj;
-                let isGizmo = false;
                 while (node) {
                   if (node.userData) {
                     if (node.userData.isGizmo) {
-                      isGizmo = true;
+                      gizmoMeshes.push(obj);
                       break;
                     }
                     if (node.userData.pieceId) {
                       candidates.push({ mesh: obj, pieceId: node.userData.pieceId, pieceClass: node.userData.pieceClass });
+                      break;
+                    }
+                    if (node.userData.isMovementHex) {
+                      hexCandidates.push({ mesh: obj, hexC: node.userData.hexC, hexR: node.userData.hexR, hexIsDash: node.userData.hexIsDash });
                       break;
                     }
                   }
@@ -800,48 +811,52 @@
               }
             });
 
-            // Check piece clicks first
-            if (candidates.length > 0) {
-              const meshList = candidates.map(c => c.mesh);
-              const intersects = raycaster.intersectObjects(meshList, false);
-              if (intersects.length > 0) {
-                const hitMesh = intersects[0].object;
-                const found = candidates.find(c => c.mesh === hitMesh);
-                if (found) {
-                  const piece = networkState.gameState.pieces[found.pieceId];
-                  if (piece) {
-                    if (networkState.role === 'client' && piece.class !== 'personagem') {
-                      return;
-                    }
-                    networkState.suppressNextGroundDeselect = false;
-                    if (networkState.role === 'client') {
-                      networkState.activeTool = 'hand';
-                    }
-                    networkState.dashMode = false;
-                    networkState.selectedPieceId = found.pieceId;
-                    if (piece.class === 'personagem') {
-                      networkState.addLog(`Selecionado: ${piece.name}. Clique no hex vermelho para mover.`);
-                    } else {
-                      networkState.addLog(`Selecionado objeto: ${piece.name}.`);
-                    }
-                  }
-                  return;
-                }
-              }
-            }
+            // Perform single raycast to preserve proper depth ordering
+            const targetMeshes = [
+              ...gizmoMeshes,
+              ...candidates.map(c => c.mesh),
+              ...hexCandidates.map(c => c.mesh)
+            ];
 
-            // Check movement hex clicks
-            if (hexCandidates.length > 0) {
-              const hexMeshList = hexCandidates.map(c => c.mesh);
-              const hexIntersects = raycaster.intersectObjects(hexMeshList, false);
-              if (hexIntersects.length > 0) {
-                const hitHex = hexIntersects[0].object;
-                const foundHex = hexCandidates.find(c => c.mesh === hitHex);
-                if (foundHex) {
-                  console.log('[DEBUG] handleGlobalPointerUp movement hex click:', foundHex.hexC, foundHex.hexR, foundHex.hexIsDash);
-                  handleHexClick(null, foundHex.hexC, foundHex.hexR, foundHex.hexIsDash);
-                  return;
+            const intersects = raycaster.intersectObjects(targetMeshes, false);
+            if (intersects.length > 0) {
+              const hitMesh = intersects[0].object;
+
+              // 1. Gizmo clicked -> ignore
+              if (gizmoMeshes.includes(hitMesh)) {
+                console.log('[DEBUG] handleGlobalPointerUp: Intersected gizmo first, ignoring click.');
+                return;
+              }
+
+              // 2. Piece clicked -> select
+              const foundPiece = candidates.find(c => c.mesh === hitMesh);
+              if (foundPiece) {
+                const piece = networkState.gameState.pieces[foundPiece.pieceId];
+                if (piece) {
+                  if (networkState.role === 'client' && piece.class !== 'personagem') {
+                    return;
+                  }
+                  networkState.suppressNextGroundDeselect = false;
+                  if (networkState.role === 'client') {
+                    networkState.activeTool = 'hand';
+                  }
+                  networkState.dashMode = false;
+                  networkState.selectedPieceId = foundPiece.pieceId;
+                  if (piece.class === 'personagem') {
+                    networkState.addLog(`Selecionado: ${piece.name}. Clique no hex vermelho para mover.`);
+                  } else {
+                    networkState.addLog(`Selecionado objeto: ${piece.name}.`);
+                  }
                 }
+                return;
+              }
+
+              // 3. Movement hex clicked -> move
+              const foundHex = hexCandidates.find(c => c.mesh === hitMesh);
+              if (foundHex) {
+                console.log('[DEBUG] handleGlobalPointerUp movement hex click:', foundHex.hexC, foundHex.hexR, foundHex.hexIsDash);
+                handleHexClick(null, foundHex.hexC, foundHex.hexR, foundHex.hexIsDash);
+                return;
               }
             }
 
