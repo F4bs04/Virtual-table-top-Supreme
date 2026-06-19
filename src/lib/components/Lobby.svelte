@@ -319,6 +319,12 @@
               <span>Friends:</span>
               <strong>{networkState.connections.length}</strong>
             </div>
+            <div class="detail-row" style="margin: 0; display: flex; justify-content: space-between; grid-column: span 2; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 0.35rem;">
+              <span>MCP Assistant:</span>
+              <strong style="color: {networkState.mcpConnected === 'connected' ? '#22c55e' : networkState.mcpConnected === 'connecting' ? '#f59e0b' : '#ef4444'}">
+                {networkState.mcpConnected === 'connected' ? 'Connected' : networkState.mcpConnected === 'connecting' ? 'Connecting...' : 'Disconnected'}
+              </strong>
+            </div>
           {/if}
         </div>
 

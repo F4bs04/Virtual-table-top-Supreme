@@ -27,6 +27,8 @@ export const networkState = $state({
   undoStack: [],
   lastAuthoritativeState: null,
   recentTextures: [],
+  mcpConnected: 'disconnected', // 'disconnected' | 'connected' | 'connecting'
+  mcpSocket: null,
 
   getDefaultRecentTextures() {
     return [
@@ -255,6 +257,7 @@ export const networkState = $state({
     networkState.disconnect();
     networkState.role = 'host';
     networkState.error = '';
+    networkState.connectToMCPServer();
     
     networkState.peer = customId ? new Peer(customId) : new Peer();
 
@@ -1861,6 +1864,7 @@ export const networkState = $state({
     networkState.peer = null;
     networkState.error = '';
     networkState.addLog("Offline Solo/Local GM mode active. signaling server connection skipped.");
+    networkState.connectToMCPServer();
   },
 
   // 3D Shape Creator
@@ -1959,6 +1963,12 @@ export const networkState = $state({
 
   // Reset and disconnect WebRTC session
   disconnect() {
+    if (networkState.mcpSocket) {
+      networkState.mcpSocket.close();
+      networkState.mcpSocket = null;
+    }
+    networkState.mcpConnected = 'disconnected';
+
     if (networkState.peer) {
       networkState.peer.destroy();
       networkState.peer = null;
@@ -1976,6 +1986,270 @@ export const networkState = $state({
       newUrl.searchParams.delete('room');
       window.history.pushState({ path: newUrl.href }, '', newUrl.href);
     }
+  },
+
+  connectToMCPServer() {
+    if (typeof window === 'undefined') return;
+    if (networkState.mcpSocket && (networkState.mcpSocket.readyState === WebSocket.OPEN || networkState.mcpSocket.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+    networkState.mcpConnected = 'connecting';
+    const ws = new WebSocket('ws://localhost:4444');
+    networkState.mcpSocket = ws;
+
+    ws.onopen = () => {
+      networkState.mcpConnected = 'connected';
+      networkState.addLog('[MCP] Connected to local AI assistant helper.');
+    };
+
+    ws.onmessage = async (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        const { type, requestId } = msg;
+
+        if (type === 'MCP_GET_STATE') {
+          ws.send(JSON.stringify({
+            requestId,
+            gameState: $state.snapshot(networkState.gameState)
+          }));
+          return;
+        }
+
+        if (type === 'MCP_CLEAR') {
+          if (networkState.role !== 'host') {
+            ws.send(JSON.stringify({ requestId, error: 'Only host can clear map.' }));
+            return;
+          }
+          const activeEnvId = networkState.gameState.currentEnvironmentId || 'env-1';
+          const env = networkState.gameState.environments?.[activeEnvId];
+          if (env) {
+            env.pieces = {};
+          }
+          Object.keys(networkState.gameState.pieces).forEach(id => {
+            const piece = networkState.gameState.pieces[id];
+            if (piece.class === 'objeto') {
+              delete networkState.gameState.pieces[id];
+            }
+          });
+          networkState.addLog('[MCP] Map cleared.');
+          networkState.broadcastGameState();
+          ws.send(JSON.stringify({ requestId, message: 'Map cleared.' }));
+          return;
+        }
+
+        if (type === 'MCP_EXECUTE_TOOL') {
+          const { toolName, arguments: args } = msg;
+          if (networkState.role !== 'host') {
+            ws.send(JSON.stringify({ requestId, error: 'Only the host can execute MCP building tools.' }));
+            return;
+          }
+
+          try {
+            if (toolName === 'add_character') {
+              const id = `p-mcp-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+              const newChar = {
+                id,
+                name: args.name,
+                class: 'personagem',
+                x: args.x,
+                y: args.y ?? 0,
+                z: args.z,
+                color: args.color ?? '#3b82f6',
+                textureUrl: args.textureUrl,
+                hp: args.hp ?? 100,
+                maxHp: args.maxHp ?? 100,
+                ep: args.ep ?? 100,
+                maxEp: args.maxEp ?? 100,
+                notes: args.notes ?? '',
+                photos: [],
+                environmentId: networkState.gameState.currentEnvironmentId || 'env-1'
+              };
+              networkState.setPiece(id, newChar);
+              networkState.addLog(`[MCP] Added character: ${args.name}`);
+              networkState.broadcastGameState();
+              ws.send(JSON.stringify({ requestId, message: `Character ${args.name} added at (${args.x}, ${args.z})` }));
+            }
+            else if (toolName === 'add_object') {
+              const id = `o-mcp-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+              const newObj = {
+                id,
+                name: args.name,
+                class: 'objeto',
+                x: args.x,
+                y: args.y ?? 0,
+                z: args.z,
+                color: args.color ?? '#d97706',
+                textureUrl: args.textureUrl,
+                width: args.width ?? 1,
+                depth: args.depth ?? 1,
+                height: args.height ?? 1,
+                notes: args.notes ?? '',
+                photos: [],
+                environmentId: networkState.gameState.currentEnvironmentId || 'env-1'
+              };
+              networkState.setPiece(id, newObj);
+              networkState.addLog(`[MCP] Added object: ${args.name}`);
+              networkState.broadcastGameState();
+              ws.send(JSON.stringify({ requestId, message: `Object ${args.name} added at (${args.x}, ${args.z})` }));
+            }
+            else if (toolName === 'add_wall') {
+              const id = `drawn-wall-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+              const envId = networkState.gameState.currentEnvironmentId || 'env-1';
+              const newWall = {
+                id,
+                name: 'Wall Line',
+                class: 'objeto',
+                structureType: 'wall-line',
+                x: args.x1,
+                z: args.z1,
+                x2: args.x2,
+                z2: args.z2,
+                height: args.height ?? 2.0,
+                thickness: args.thickness ?? 0.15,
+                y: args.y ?? 0,
+                color: args.color ?? '#64748b',
+                openings: [],
+                textureUrl: args.textureUrl ?? '',
+                hp: null,
+                maxHp: null,
+                notes: '',
+                photos: [],
+                environmentId: envId
+              };
+              networkState.setPiece(id, newWall);
+              networkState.addLog(`[MCP] Drawn wall from (${args.x1}, ${args.z1}) to (${args.x2}, ${args.z2})`);
+              networkState.broadcastGameState();
+              ws.send(JSON.stringify({ requestId, message: `Wall segment drawn.` }));
+            }
+            else if (toolName === 'add_floor') {
+              if (args.points && args.points.length >= 3) {
+                const id = `drawn-floor-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+                const envId = networkState.gameState.currentEnvironmentId || 'env-1';
+                const newFloor = {
+                  id,
+                  name: 'Custom Floor Polygon',
+                  class: 'objeto',
+                  structureType: 'floor-plane',
+                  points: args.points,
+                  y: args.y ?? 0,
+                  color: args.color ?? '#a855f7',
+                  textureUrl: args.textureUrl ?? '',
+                  hp: null,
+                  maxHp: null,
+                  notes: '',
+                  photos: [],
+                  environmentId: envId
+                };
+                networkState.setPiece(id, newFloor);
+                networkState.addLog(`[MCP] Drawn polygon floor with ${args.points.length} points.`);
+                networkState.broadcastGameState();
+                ws.send(JSON.stringify({ requestId, message: `Polygon floor drawn.` }));
+              } else if (args.x !== undefined && args.z !== undefined && args.width !== undefined && args.depth !== undefined) {
+                const id = `drawn-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+                const envId = networkState.gameState.currentEnvironmentId || 'env-1';
+                const newFloor = {
+                  id,
+                  name: 'Floor Plane',
+                  class: 'objeto',
+                  structureType: 'floor-plane',
+                  shape: 'box',
+                  width: args.width,
+                  depth: args.depth,
+                  height: 0.05,
+                  x: args.x,
+                  y: args.y ?? 0,
+                  z: args.z,
+                  color: args.color ?? '#a855f7',
+                  textureUrl: args.textureUrl ?? '',
+                  hp: null,
+                  maxHp: null,
+                  notes: '',
+                  photos: [],
+                  environmentId: envId
+                };
+                networkState.setPiece(id, newFloor);
+                networkState.addLog(`[MCP] Drawn rectangular floor ${args.width}x${args.depth} at (${args.x}, ${args.z})`);
+                networkState.broadcastGameState();
+                ws.send(JSON.stringify({ requestId, message: `Rectangular floor drawn.` }));
+              } else {
+                ws.send(JSON.stringify({ requestId, error: 'Invalid floor arguments. Provide points or x,z,width,depth.' }));
+              }
+            }
+            else if (toolName === 'add_door_or_window') {
+              const wall = networkState.getPiece(args.wallId);
+              if (!wall || wall.structureType !== 'wall-line') {
+                ws.send(JSON.stringify({ requestId, error: `Wall segment with ID ${args.wallId} not found.` }));
+                return;
+              }
+              if (!wall.openings) wall.openings = [];
+              const openingId = `op-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+              const newOpening = {
+                id: openingId,
+                type: args.type,
+                position: args.position ?? 0.5,
+                width: args.width ?? (args.type === 'door' ? 0.9 : 0.8),
+                height: args.height ?? (args.type === 'door' ? 1.8 : 1.0),
+                yOffset: args.type === 'door' ? 0.0 : 0.6,
+                isOpen: false
+              };
+              wall.openings.push(newOpening);
+              networkState.addLog(`[MCP] Added ${args.type} to wall ${wall.name}`);
+              networkState.broadcastGameState();
+              ws.send(JSON.stringify({ requestId, message: `Added ${args.type} opening to wall.` }));
+            }
+            else if (toolName === 'update_piece') {
+              const piece = networkState.getPiece(args.id);
+              if (!piece) {
+                ws.send(JSON.stringify({ requestId, error: `Piece with ID ${args.id} not found.` }));
+                return;
+              }
+              networkState.updatePieceDetails(args.id, args.updates);
+              if (args.updates.hp !== undefined) {
+                piece.hp = args.updates.hp;
+              }
+              if (args.updates.maxHp !== undefined) {
+                piece.maxHp = args.updates.maxHp;
+              }
+              networkState.broadcastGameState();
+              ws.send(JSON.stringify({ requestId, message: `Updated piece ${piece.name || args.id}` }));
+            }
+            else if (toolName === 'delete_piece') {
+              const piece = networkState.getPiece(args.id);
+              if (!piece) {
+                ws.send(JSON.stringify({ requestId, error: `Piece with ID ${args.id} not found.` }));
+                return;
+              }
+              networkState.deletePiece(args.id);
+              networkState.addLog(`[MCP] Deleted piece: ${piece.name || args.id}`);
+              networkState.broadcastGameState();
+              ws.send(JSON.stringify({ requestId, message: `Piece deleted.` }));
+            }
+            else {
+              ws.send(JSON.stringify({ requestId, error: `Tool ${toolName} not implemented.` }));
+            }
+          } catch (e) {
+            ws.send(JSON.stringify({ requestId, error: e.message }));
+          }
+        }
+      } catch (err) {
+        console.error('[MCP Client] Error processing message:', err);
+      }
+    };
+
+    ws.onclose = () => {
+      networkState.mcpConnected = 'disconnected';
+      networkState.mcpSocket = null;
+      networkState.addLog('[MCP] Disconnected from local AI assistant helper.');
+      setTimeout(() => {
+        if (networkState.role === 'host') {
+          networkState.connectToMCPServer();
+        }
+      }, 5000);
+    };
+
+    ws.onerror = () => {
+      networkState.mcpConnected = 'disconnected';
+    };
   }
 });
 

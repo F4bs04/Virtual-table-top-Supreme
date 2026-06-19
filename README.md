@@ -1,43 +1,76 @@
-# Svelte + Vite
+# 🏰 AETHELGARD: SOUL VTT // Virtual Table Top Supreme
 
-This template should help get you started developing with Svelte in Vite.
+**Aethelaard** é uma revolução completa na forma de mestrar e jogar RPG online. Desenvolvido com uma moderna arquitetura em **Svelte 5 (Runes)**, **Vite** e renderização 3D de alta performance com **Three.js / Threlte**, este tabuleiro virtual (VTT) elimina a necessidade de servidores centrais complexos ou assinaturas caras, entregando uma experiência imersiva diretamente no navegador.
 
-## Recommended IDE Setup
+---
 
-[VS Code](https://code.visualstudio.com/) + [Svelte](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode).
+## 🚀 A Revolução do Tabuleiro de RPG: Construção Dinâmica por Inteligência Artificial (MCP)
 
-## Need an official Svelte framework?
+Aethelaard traz para o mundo do RPG o **Model Context Protocol (MCP)**, permitindo que você construa, altere e popule seus mapas tridimensionais em tempo real usando apenas **prompts em linguagem natural** através de uma Inteligência Artificial!
 
-Check out [SvelteKit](https://github.com/sveltejs/kit#readme), which is also powered by Vite. Deploy anywhere with its serverless-first approach and adapt to various platforms, with out of the box support for TypeScript, SCSS, and Less, and easily-added support for mdsvex, GraphQL, PostCSS, Tailwind CSS, and more.
+Imagine conversar com o seu co-piloto de IA e dizer:
+> *"Crie uma masmorra abandonada com quatro salas interconectadas. Adicione portas de madeira nas entradas, coloque alguns baús trancados e barris de suprimentos nos cantos, e spawne três monstros na sala principal."*
 
-## Technical considerations
+A IA lê a lista de assets disponíveis do seu projeto (tokens, modelos 3D, texturas de pedra/madeira) e desenha paredes, portas, pisos, inimigos e detalhes automaticamente no tabuleiro em segundos!
 
-**Why use this over SvelteKit?**
+---
 
-- It brings its own routing solution which might not be preferable for some users.
-- It is first and foremost a framework that just happens to use Vite under the hood, not a Vite app.
+## ✨ Recursos de Destaque (Features)
 
-This template contains as little as possible to get started with Vite + Svelte, while taking into account the developer experience with regards to HMR and intellisense. It demonstrates capabilities on par with the other `create-vite` templates and is a good starting point for beginners dipping their toes into a Vite + Svelte project.
+### 🎨 1. Motor 3D de Alta Performance (Three.js & Threlte)
+* Visualização imersiva em 3D de alta fidelidade diretamente no browser.
+* Suporte a formas geométricas customizadas e importação direta de modelos **3D (.glb / .gltf)**.
+* Efeitos de partículas em tempo real controlados pelo GM (explosões espirituais, reações mágicas, relâmpagos).
+* Texturização flexível e responsiva com troca rápida de imagens de tokens e cenários.
 
-Should you later need the extended capabilities and extensibility provided by SvelteKit, the template has been structured similarly to SvelteKit so that it is easy to migrate.
+### 🌐 2. Conectividade Peer-to-Peer Autêntica (PeerJS)
+* **Sem servidores intermediários**: conexões diretas WebRTC seguras e de baixíssima latência entre o GM (Host) e os jogadores (Clients).
+* Sincronização instantânea de posições, atributos, fichas de personagem e rolagens de dados.
+* Sistema inteligente de detecção de colisões para impedir que jogadores atravessem paredes ou andem distâncias não permitidas.
 
-**Why include `.vscode/extensions.json`?**
+### ⚡ 3. Fichas de Personagem Dinâmicas e Runes do Svelte 5
+* Fichas de RPG interativas e integradas com sistema de HP/EP (Energy Points) e habilidades especiais (como o comando *Dash* para movimentação tática).
+* Indicadores visuais de estados de combate (como *Stun* e *Death State*).
+* Histórico global de log de rolagens e ações executadas no tabuleiro.
 
-Other templates indirectly recommend extensions via the README, but this file allows VS Code to prompt the user to install the recommended extension upon opening the project.
+### ⛺ 4. Ambientes Multicamadas e Cenários
+* Crie múltiplos cenários isolados na mesma sessão (ex: Soul Society, Karakura Town, Hueco Mundo).
+* Mude o tema visual, opacidade de mapas de fundo e gerencie múltiplos andares e elevações (SketchUp style) com plataformas elevadas e escadas interativas.
 
-**Why enable `checkJs` in the JS template?**
+### 🛠️ 5. Modo Offline & Solo
+* Jogue ou prepare sessões de forma 100% offline localmente, salvando e carregando o estado de sua campanha em arquivos JSON com apenas um clique.
 
-It is likely that most cases of changing variable types in runtime are likely to be accidental, rather than deliberate. This provides advanced typechecking out of the box. Should you like to take advantage of the dynamically-typed nature of JavaScript, it is trivial to change the configuration.
+---
 
-**Why is HMR not preserving my local component state?**
+## 💻 Como Rodar o Projeto Localmente
 
-HMR state preservation comes with a number of gotchas! It has been disabled by default in both `svelte-hmr` and `@sveltejs/vite-plugin-svelte` due to its often surprising behavior. You can read the details [here](https://github.com/sveltejs/svelte-hmr/tree/master/packages/svelte-hmr#preservation-of-local-state).
+### 1. Pré-requisitos
+* Node.js instalado (v18 ou superior recomendado).
 
-If you have state that's important to retain within a component, consider creating an external store which would not be replaced by HMR.
-
-```js
-// store.js
-// An extremely simple external store
-import { writable } from 'svelte/store'
-export default writable(0)
+### 2. Instalação e Inicialização
+Clone o repositório, instale as dependências e inicie o servidor Vite:
+```bash
+npm install
+npm run dev
 ```
+Acesse o link gerado (geralmente `http://localhost:5173`) no seu navegador.
+
+### 3. Executando o Assistente de Construção IA (MCP Server)
+Para habilitar a construção de mapas via inteligência artificial:
+```bash
+node mcp-server.js
+```
+Configure o servidor MCP em seu cliente de IA (como Cursor ou Claude Desktop) apontando para o arquivo `mcp-server.js`.
+
+---
+
+## 🛠️ Tecnologias Utilizadas
+* **Svelte 5** (utilizando o poder dos Runes para reatividade ultrafina)
+* **Three.js & Threlte** (renderização gráfica 3D acelerada por hardware)
+* **Vite** (bundler de desenvolvimento rápido)
+* **PeerJS / WebRTC** (comunicação P2P direta)
+* **WebSockets & MCP** (comunicação bidirecional local com a IA de desenvolvimento)
+
+---
+
+Aethelaard redefine os limites do RPG de mesa virtual, unindo o poder da computação gráfica 3D moderna à interatividade ágil da Inteligência Artificial Generativa. Monte sua mesa, conecte seus amigos e crie mundos num piscar de olhos!
