@@ -170,6 +170,15 @@
     }
   });
 
+  // Force material color update when activeTexture or color prop changes
+  $effect(() => {
+    if (matRef) {
+      const targetColor = activeTexture ? '#ffffff' : color;
+      matRef.color.set(targetColor);
+      matRef.needsUpdate = true;
+    }
+  });
+
   const objectFloor = $derived(Math.round(y / floorHeight) + 1);
   const opacityMultiplier = $derived.by(() => {
     const diff = networkState.currentViewLevel - objectFloor;

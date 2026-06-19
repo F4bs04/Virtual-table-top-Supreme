@@ -452,31 +452,34 @@ export const networkState = $state({
   broadcastGameState() {
     if (networkState.role !== 'host') return;
     
-    const snap = $state.snapshot(networkState.gameState);
-    
-    // Check if we need to initialize lastAuthoritativeState
-    if (!networkState.lastAuthoritativeState) {
-      networkState.lastAuthoritativeState = snap;
-    } else {
-      const snapStr = JSON.stringify(snap);
-      const lastStr = JSON.stringify(networkState.lastAuthoritativeState);
-      if (snapStr !== lastStr) {
-        networkState.undoStack.push(networkState.lastAuthoritativeState);
-        if (networkState.undoStack.length > 50) {
-          networkState.undoStack.shift();
-        }
+    clearTimeout(broadcastTimeout);
+    broadcastTimeout = setTimeout(() => {
+      const snap = $state.snapshot(networkState.gameState);
+      
+      // Check if we need to initialize lastAuthoritativeState
+      if (!networkState.lastAuthoritativeState) {
         networkState.lastAuthoritativeState = snap;
+      } else {
+        const snapStr = JSON.stringify(snap);
+        const lastStr = JSON.stringify(networkState.lastAuthoritativeState);
+        if (snapStr !== lastStr) {
+          networkState.undoStack.push(networkState.lastAuthoritativeState);
+          if (networkState.undoStack.length > 50) {
+            networkState.undoStack.shift();
+          }
+          networkState.lastAuthoritativeState = snap;
+        }
       }
-    }
 
-    networkState.connections.forEach(conn => {
-      if (conn.open) {
-        conn.send({
-          type: 'STATE_UPDATE',
-          gameState: snap
-        });
-      }
-    });
+      networkState.connections.forEach(conn => {
+        if (conn.open) {
+          conn.send({
+            type: 'STATE_UPDATE',
+            gameState: snap
+          });
+        }
+      });
+    }, 50);
   },
 
   // Move request execution
