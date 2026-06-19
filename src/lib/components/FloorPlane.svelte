@@ -33,11 +33,29 @@
   });
 
   let activeTexture = $state(null);
+  let matRef = $state(null);
   let isHovered = $state(false);
   const isSelected = $derived(networkState.selectedPieceId === id);
 
+  function applyPlanarUV(geom) {
+    geom.computeBoundingBox();
+    const pos = geom.attributes.position;
+    const box = geom.boundingBox;
+    if (!pos || !box) return;
+
+    const sizeX = box.max.x - box.min.x || 1;
+    const sizeY = box.max.y - box.min.y || 1;
+    const uvArray = new Float32Array(pos.count * 2);
+    for (let i = 0; i < pos.count; i++) {
+      uvArray[i * 2] = (pos.getX(i) - box.min.x) / sizeX;
+      uvArray[i * 2 + 1] = (pos.getY(i) - box.min.y) / sizeY;
+    }
+    geom.setAttribute('uv', new THREE.BufferAttribute(uvArray, 2));
+  }
+
   $effect(() => {
     if (textureUrl) {
+      activeTexture = null;
       const loader = new THREE.TextureLoader();
       loader.load(
         textureUrl,
@@ -58,6 +76,23 @@
     } else {
       activeTexture = null;
     }
+  });
+
+  $effect(() => {
+    const mat = matRef;
+    const tex = activeTexture;
+    if (!mat) return;
+
+    if (tex) {
+      mat.map = tex;
+      mat.color.set('#ffffff');
+      mat.opacity = 0.85 * opacityMultiplier;
+    } else {
+      mat.map = null;
+      mat.color.set(color);
+      mat.opacity = 0.65 * opacityMultiplier;
+    }
+    mat.needsUpdate = true;
   });
 
   // Update texture repeat reactively when width or depth changes
@@ -93,6 +128,7 @@
         depth: 0.05,
         bevelEnabled: false
       });
+      applyPlanarUV(newGeom);
       
       geometry = newGeom;
       if (oldGeom) oldGeom.dispose();
@@ -159,11 +195,7 @@
       {#if !points}
         <T.PlaneGeometry args={[width, depth]} />
       {/if}
-      {#if activeTexture}
-        <T.MeshBasicMaterial map={activeTexture} color="#ffffff" side={THREE.DoubleSide} transparent opacity={0.85 * opacityMultiplier} />
-      {:else}
-        <T.MeshBasicMaterial color={color} side={THREE.DoubleSide} transparent opacity={0.65 * opacityMultiplier} />
-      {/if}
+      <T.MeshBasicMaterial bind:ref={matRef} color={color} side={THREE.DoubleSide} transparent opacity={0.65 * opacityMultiplier} />
     </T.Mesh>
   {/if}
 

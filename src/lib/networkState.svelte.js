@@ -27,27 +27,46 @@ export const networkState = $state({
   lastAuthoritativeState: null,
   recentTextures: [],
 
+  getDefaultRecentTextures() {
+    return [
+      { name: 'Black Brick', path: '/Model/textures/Black_brick.png' },
+      { name: 'Brick Texture', path: '/Model/textures/Bricktexture.png' },
+      { name: 'Gray Brick', path: '/Model/textures/Bricktexture_gray.png' },
+      { name: 'Concrete', path: '/Model/textures/concrete.png' },
+      { name: 'Wood Floor', path: '/Model/textures/wood_floor.png' }
+    ];
+  },
+
   loadRecentTextures() {
     try {
       const stored = localStorage.getItem('vtt_recent_textures');
       if (stored) {
-        networkState.recentTextures = JSON.parse(stored);
+        const parsed = JSON.parse(stored);
+        const normalized = Array.isArray(parsed)
+          ? parsed
+              .map((tex) => ({
+                name: tex?.name || 'Texture',
+                path: tex?.path || tex?.url || tex?.textureUrl || ''
+              }))
+              .filter((tex) => tex.path)
+          : [];
+
+        const defaults = networkState.getDefaultRecentTextures();
+        const byPath = new Map([...normalized, ...defaults].map((tex) => [tex.path, tex]));
+        networkState.recentTextures = Array.from(byPath.values()).slice(0, 20);
+        localStorage.setItem('vtt_recent_textures', JSON.stringify(networkState.recentTextures));
       } else {
         // default textures on first load
-        networkState.recentTextures = [
-          { name: 'Black Brick', path: '/Model/textures/Black_brick.png' },
-          { name: 'Brick Texture', path: '/Model/textures/Bricktexture.png' },
-          { name: 'Gray Brick', path: '/Model/textures/Bricktexture_gray.png' },
-          { name: 'Concrete', path: '/Model/textures/concrete.png' },
-          { name: 'Wood Floor', path: '/Model/textures/wood_floor.png' }
-        ];
+        networkState.recentTextures = networkState.getDefaultRecentTextures();
       }
     } catch (e) {
       console.error('Failed to load recent textures:', e);
+      networkState.recentTextures = networkState.getDefaultRecentTextures();
     }
   },
 
   addRecentTexture(name, path) {
+    if (!path) return;
     // Avoid duplicates, move to front
     networkState.recentTextures = networkState.recentTextures.filter(t => t.path !== path);
     networkState.recentTextures.unshift({ name, path });

@@ -36,6 +36,7 @@
   // Load custom wall texture reactively
   $effect(() => {
     if (textureUrl) {
+      activeTexture = null;
       const loader = new THREE.TextureLoader();
       loader.load(
         textureUrl,
@@ -45,10 +46,6 @@
           tex.wrapT = THREE.RepeatWrapping;
           const rep = Number(textureRepeat) || 1;
           tex.repeat.set(width * rep, buildingHeight * rep);
-          if (matRef) {
-            matRef.map = tex;
-            matRef.needsUpdate = true;
-          }
           activeTexture = tex;
         },
         undefined,
@@ -60,6 +57,21 @@
     } else {
       activeTexture = null;
     }
+  });
+
+  $effect(() => {
+    const mat = matRef;
+    const tex = activeTexture;
+    if (!mat) return;
+
+    if (tex) {
+      mat.map = tex;
+      mat.color.set('#ffffff');
+    } else {
+      mat.map = null;
+      mat.color.set(color);
+    }
+    mat.needsUpdate = true;
   });
 
   // Reactively update texture repeat parameters when dimensions scale
@@ -132,8 +144,7 @@
     <T.BoxGeometry args={[width, buildingHeight, depth]} />
     <T.MeshBasicMaterial 
       bind:ref={matRef}
-      color={activeTexture ? '#ffffff' : color} 
-      map={activeTexture}
+      color={color} 
       side={wallMaterialSide} 
       transparent 
       opacity={wallOpacity} 

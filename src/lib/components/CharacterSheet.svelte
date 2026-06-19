@@ -172,6 +172,18 @@
     networkState.updatePieceDetails(piece.id, { textureUrl: photoUrl });
   }
 
+  function applyGalleryTexture(item, closePopup) {
+    if (!piece || !canEdit) return;
+    const path = item?.path || item?.url || item?.textureUrl || '';
+    if (!path) {
+      networkState.addLog('Textura inválida na galeria.');
+      return;
+    }
+    networkState.updatePieceTexture(piece.id, path);
+    networkState.addRecentTexture(item?.name || 'Texture', path);
+    closePopup();
+  }
+
   function removePhoto(index) {
     if (!piece || !canEdit) return;
     const photos = [...(piece.photos ?? [])];
@@ -969,11 +981,9 @@
       <div class="popup-grid-container">
         {#each networkState.recentTextures as tex}
           <button class="popup-grid-item" onclick={() => { 
-            networkState.updatePieceTexture(piece.id, tex.path); 
-            networkState.addRecentTexture(tex.name, tex.path);
-            showTexturePopup = false; 
+            applyGalleryTexture(tex, () => showTexturePopup = false);
           }}>
-            <img src={tex.path} alt={tex.name} class="popup-item-thumb" />
+            <img src={tex.path || tex.url || tex.textureUrl} alt={tex.name} class="popup-item-thumb" />
             <span class="popup-item-name">{tex.name}</span>
           </button>
         {/each}
@@ -996,9 +1006,7 @@
       <div class="popup-grid-container bleach-grid">
         {#each bleachCollection as item}
           <button class="popup-grid-item" onclick={() => { 
-            networkState.updatePieceTexture(piece.id, item.path); 
-            networkState.addRecentTexture(item.name, item.path);
-            showBleachPopup = false; 
+            applyGalleryTexture(item, () => showBleachPopup = false);
           }}>
             <img src={item.path} alt={item.name} class="popup-item-thumb character-thumb" />
             <span class="popup-item-name">{item.name}</span>

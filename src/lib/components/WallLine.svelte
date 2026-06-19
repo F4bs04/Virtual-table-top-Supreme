@@ -133,6 +133,7 @@
   // Load texture reactively — re-runs when textureUrl changes
   $effect(() => {
     if (textureUrl) {
+      activeTexture = null;
       const loader = new THREE.TextureLoader();
       const capturedRepeat = Number(textureRepeat) || 1;
       const capturedLength = length;
