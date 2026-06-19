@@ -72,6 +72,7 @@
     geom.setAttribute('uv', new THREE.BufferAttribute(uvArray, 2));
   }
 
+  // Rebuild geometry when dimensions or openings change
   $effect(() => {
     const currentLength = length;
     const currentHeight = height;
@@ -125,34 +126,30 @@
   });
 
   onDestroy(() => {
-    if (geometry) {
-      geometry.dispose();
-    }
+    if (geometry) geometry.dispose();
+    if (activeTexture) activeTexture.dispose();
   });
 
-  // Load texture reactively
+  // Load texture reactively — re-runs when textureUrl changes
   $effect(() => {
-    console.log('[WallLine] textureUrl effect triggered:', textureUrl ? textureUrl.substring(0, 30) + '...' : 'none');
     if (textureUrl) {
       const loader = new THREE.TextureLoader();
+      const capturedRepeat = Number(textureRepeat) || 1;
+      const capturedLength = length;
+      const capturedHeight = height;
       loader.load(
         textureUrl,
         (tex) => {
-          console.log('[WallLine] texture loaded successfully');
           tex.colorSpace = THREE.SRGBColorSpace;
           tex.wrapS = THREE.RepeatWrapping;
           tex.wrapT = THREE.RepeatWrapping;
-          const rep = Number(textureRepeat) || 1;
-          tex.repeat.set(length * rep, height * rep);
-          if (matRef) {
-            matRef.map = tex;
-            matRef.needsUpdate = true;
-          }
+          tex.repeat.set(capturedLength * capturedRepeat, capturedHeight * capturedRepeat);
+          tex.needsUpdate = true;
           activeTexture = tex;
         },
         undefined,
         (err) => {
-          console.error("[WallLine] Error loading wall line texture:", err);
+          console.error('[WallLine] Error loading texture:', err);
           activeTexture = null;
         }
       );
@@ -161,22 +158,28 @@
     }
   });
 
-  // Reactively scale texture repeat on dimension changes
+  // Apply texture/color to material — runs whenever matRef OR activeTexture changes
   $effect(() => {
-    if (activeTexture) {
-      const rep = Number(textureRepeat) || 1;
-      activeTexture.repeat.set(length * rep, height * rep);
-      activeTexture.needsUpdate = true;
+    const mat = matRef;
+    const tex = activeTexture;
+    if (!mat) return;
+    if (tex) {
+      mat.map = tex;
+      mat.color.set('#ffffff');
+    } else {
+      mat.map = null;
+      mat.color.set(color);
     }
+    mat.needsUpdate = true;
   });
 
-  // Force material color update when activeTexture or color prop changes
+  // Reactively update texture tiling when dimensions or repeat changes
   $effect(() => {
-    if (matRef) {
-      const targetColor = activeTexture ? '#ffffff' : color;
-      matRef.color.set(targetColor);
-      matRef.needsUpdate = true;
-    }
+    const tex = activeTexture;
+    if (!tex) return;
+    const rep = Number(textureRepeat) || 1;
+    tex.repeat.set(length * rep, height * rep);
+    tex.needsUpdate = true;
   });
 
   const objectFloor = $derived(Math.round(y / floorHeight) + 1);
@@ -298,4 +301,3 @@
     {/if}
   {/each}
 </T.Group>
-
