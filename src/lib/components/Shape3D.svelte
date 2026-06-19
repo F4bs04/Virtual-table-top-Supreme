@@ -174,18 +174,20 @@
 
     const deltaX = worldDelta.x;
     const newX = Math.max(0, Math.min(networkState.gameState.gridSize || 24, startXVal + deltaX));
-    networkState.gameState.pieces[id].x = newX;
+    const piece = networkState.getPiece(id);
+    if (piece) piece.x = newX;
   }
 
-  function handleTransXEnd(e) {
+  function handleWindowTransXEnd(e) {
     if (!isTranslatingX) return;
     isTranslatingX = false;
     networkState.draggedPieceId = null;
     window.removeEventListener('pointermove', handleWindowTransXMove);
     window.removeEventListener('pointerup', handleWindowTransXEnd);
-    networkState.gameState.pieces[id].x = Math.round(networkState.gameState.pieces[id].x);
+    const piece = networkState.getPiece(id);
+    if (piece) piece.x = Math.round(piece.x);
     networkState.broadcastGameState();
-    networkState.addLog(`Objeto movido para X: ${networkState.gameState.pieces[id].x}`);
+    if (piece) networkState.addLog(`Objeto movido para X: ${piece.x}`);
   }
 
   // Window handlers for Translation Z (Blender style camera space projection)
@@ -223,18 +225,20 @@
 
     const deltaZ = worldDelta.z;
     const newZ = Math.max(0, Math.min(networkState.gameState.gridSize || 24, startZVal + deltaZ));
-    networkState.gameState.pieces[id].z = newZ;
+    const piece = networkState.getPiece(id);
+    if (piece) piece.z = newZ;
   }
 
-  function handleTransZEnd(e) {
+  function handleWindowTransZEnd(e) {
     if (!isTranslatingZ) return;
     isTranslatingZ = false;
     networkState.draggedPieceId = null;
     window.removeEventListener('pointermove', handleWindowTransZMove);
     window.removeEventListener('pointerup', handleWindowTransZEnd);
-    networkState.gameState.pieces[id].z = Math.round(networkState.gameState.pieces[id].z);
+    const piece = networkState.getPiece(id);
+    if (piece) piece.z = Math.round(piece.z);
     networkState.broadcastGameState();
-    networkState.addLog(`Objeto movido para Z: ${networkState.gameState.pieces[id].z}`);
+    if (piece) networkState.addLog(`Objeto movido para Z: ${piece.z}`);
   }
 
   onDestroy(() => {

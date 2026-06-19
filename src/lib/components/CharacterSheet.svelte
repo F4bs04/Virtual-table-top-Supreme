@@ -182,7 +182,11 @@
   // ── Structure property helpers ─────────────────────────────────────────────
   function updateStructureProp(key, val) {
     if (!piece || !canEdit) return;
-    networkState.updatePieceDetails(piece.id, { [key]: Number(val) });
+    if (key === 'color') {
+      networkState.updatePieceDetails(piece.id, { color: val });
+    } else {
+      networkState.updatePieceDetails(piece.id, { [key]: Number(val) });
+    }
   }
 </script>
 
