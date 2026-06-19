@@ -202,7 +202,7 @@ export const networkState = $state({
         delete envs[envId].pieces[id];
       }
     });
-    networkState.broadcastGameState();
+    networkState.broadcastGameState(true);
   },
 
   duplicatePiece(pieceId) {
@@ -237,7 +237,7 @@ export const networkState = $state({
     networkState.drawingMode = false;
     networkState.drawingStartHex = null;
     networkState.addLog(`Duplicated ${source.name}. Move mode active for the copy.`);
-    networkState.broadcastGameState();
+    networkState.broadcastGameState(true);
     return id;
   },
 
@@ -454,7 +454,7 @@ export const networkState = $state({
       if (typeof scale === 'number') piece.scale = scale;
       if (typeof textureUrl === 'string') piece.textureUrl = textureUrl;
       networkState.addLog(`Client ${conn.peer} updated sheet/states for ${piece.name}`);
-      networkState.broadcastGameState();
+      networkState.broadcastGameState(true);
       return;
     }
     if (data.type === 'INTENT_DASH') {
@@ -544,12 +544,12 @@ export const networkState = $state({
       const safeFloor = Math.max(1, Math.min(house.floors || 1, Math.round(data.floor || 1)));
       house.activeFloor = safeFloor;
       networkState.addLog(`Client ${conn.peer} accessed ${house.name} floor ${safeFloor}`);
-      networkState.broadcastGameState();
+      networkState.broadcastGameState(true);
     } else if (data.type === 'INTENT_ROLL') {
       const { roll } = data;
       networkState.gameState.recentRolls = [roll, ...networkState.gameState.recentRolls.slice(0, 9)];
       networkState.addLog(`${roll.name} rolled ${roll.die}: [ ${roll.result} ]`);
-      networkState.broadcastGameState();
+      networkState.broadcastGameState(true);
     } else if (data.type === 'INTENT_PIECE_EFFECT') {
       const { pieceId, effectType } = data;
       const piece = networkState.gameState.pieces[pieceId];
@@ -559,7 +559,7 @@ export const networkState = $state({
           timestamp: Date.now()
         };
         networkState.addLog(`Client ${conn.peer} triggered visual effect '${effectType}' on ${piece.name}`);
-        networkState.broadcastGameState();
+        networkState.broadcastGameState(true);
       }
     }
   },
@@ -686,23 +686,50 @@ export const networkState = $state({
     const prevState = networkState.undoStack.pop();
     networkState.gameState = prevState;
     networkState.lastAuthoritativeState = $state.snapshot(prevState);
-    networkState.broadcastGameState();
+    networkState.broadcastGameState(true);
     networkState.addLog('Ação desfeita (Ctrl+Z).');
   },
 
   // Broadcast game state to all clients
-  broadcastGameState() {
+  broadcastGameState(isFull = false) {
     if (networkState.role !== 'host') return;
     
+    const stripLargeAssets = (snap) => {
+      const stripPiece = (piece) => {
+        if (piece) {
+          delete piece.photos;
+          if (piece.textureUrl && piece.textureUrl.startsWith('data:')) {
+            delete piece.textureUrl;
+          }
+        }
+      };
+      if (snap.pieces) {
+        for (const piece of Object.values(snap.pieces)) {
+          stripPiece(piece);
+        }
+      }
+      if (snap.environments) {
+        for (const env of Object.values(snap.environments)) {
+          if (env.pieces) {
+            for (const piece of Object.values(env.pieces)) {
+              stripPiece(piece);
+            }
+          }
+        }
+      }
+      return snap;
+    };
+
     clearTimeout(broadcastTimeout);
     broadcastTimeout = setTimeout(() => {
       const snap = $state.snapshot(networkState.gameState);
+      const payloadState = isFull ? snap : stripLargeAssets(snap);
       
       networkState.connections.forEach(conn => {
         if (conn.open) {
           conn.send({
             type: 'STATE_UPDATE',
-            gameState: snap
+            gameState: payloadState
           });
         }
       });
@@ -790,7 +817,7 @@ export const networkState = $state({
     
     networkState.gameState.buildMode = !networkState.gameState.buildMode;
     networkState.addLog(`Build Mode toggled to: ${networkState.gameState.buildMode ? 'ON (Master can move objects)' : 'OFF'}`);
-    networkState.broadcastGameState();
+    networkState.broadcastGameState(true);
   },  // Update piece texture
   updatePieceTexture(pieceId, url) {
     if (networkState.role === 'client') {
@@ -815,7 +842,7 @@ export const networkState = $state({
     if (piece) {
       piece.textureUrl = url;
       networkState.addLog(`Updated texture for piece: ${piece.name}`);
-      networkState.broadcastGameState();
+      networkState.broadcastGameState(true);
     }
   },
 
@@ -942,7 +969,7 @@ export const networkState = $state({
     }
 
     networkState.addLog(`Updated asset details: ${piece.name}`);
-    networkState.broadcastGameState();
+    networkState.broadcastGameState(true);
   },
 
   // Add drawn structure (SketchUp style)
@@ -992,7 +1019,7 @@ export const networkState = $state({
     };
     networkState.setPiece(id, newStructure);
     networkState.addLog(`Drawn ${structureType} at hex (${x}, ${z}) with size ${width}x${depth} snapped to Y=${baseHeight}`);
-    networkState.broadcastGameState();
+    networkState.broadcastGameState(true);
   },
 
   isPointInPolygon(x, y, polygon) {
@@ -1070,7 +1097,7 @@ export const networkState = $state({
     };
     networkState.setPiece(id, newFloor);
     networkState.addLog(`Created custom floor polygon with ${points.length} vertices at Y=${baseHeight}`);
-    networkState.broadcastGameState();
+    networkState.broadcastGameState(true);
   },
 
   // Add drawn wall line (Sims style)
@@ -1124,7 +1151,7 @@ export const networkState = $state({
     };
     networkState.setPiece(id, newWall);
     networkState.addLog(`Drawn ${actualType} from (${x1}, ${z1}) to (${x2}, ${z2}) at level Y=${baseHeight}`);
-    networkState.broadcastGameState();
+    networkState.broadcastGameState(true);
   },
 
   addWallOpening(wallId, type) {
@@ -1150,7 +1177,7 @@ export const networkState = $state({
 
     wall.openings.push(newOpening);
     networkState.addLog(`Added ${type} opening to wall ${wall.name}`);
-    networkState.broadcastGameState();
+    networkState.broadcastGameState(true);
   },
 
   removeWallOpening(wallId, openingId) {
@@ -1163,7 +1190,7 @@ export const networkState = $state({
 
     wall.openings = wall.openings.filter(op => op.id !== openingId);
     networkState.addLog(`Removed opening from wall ${wall.name}`);
-    networkState.broadcastGameState();
+    networkState.broadcastGameState(true);
   },
 
   updateWallOpening(wallId, openingId, updates) {
@@ -1182,7 +1209,7 @@ export const networkState = $state({
     if (typeof updates.height === 'number') op.height = Math.max(0.1, updates.height);
     if (typeof updates.yOffset === 'number') op.yOffset = Math.max(0.0, updates.yOffset);
 
-    networkState.broadcastGameState();
+    networkState.broadcastGameState(true);
   },
 
   toggleWallOpening(wallId, openingId) {
@@ -1206,7 +1233,7 @@ export const networkState = $state({
 
     op.isOpen = !op.isOpen;
     networkState.addLog(`Toggled door: ${op.isOpen ? 'Opened' : 'Closed'}`);
-    networkState.broadcastGameState();
+    networkState.broadcastGameState(true);
   },
 
   // Update Grid Size
@@ -1218,7 +1245,7 @@ export const networkState = $state({
     const validSize = Math.max(8, Math.min(128, Math.round(size / 4) * 4));
     networkState.gameState.gridSize = validSize;
     networkState.addLog(`Grid size updated to: ${validSize}x${validSize}`);
-    networkState.broadcastGameState();
+    networkState.broadcastGameState(true);
   },
 
   // Update Basic Plane Size
@@ -1230,7 +1257,7 @@ export const networkState = $state({
     if (['small', 'medium', 'large'].includes(size)) {
       networkState.gameState.basicPlaneSize = size;
       networkState.addLog(`Basic plane size updated to: ${size.toUpperCase()}`);
-      networkState.broadcastGameState();
+      networkState.broadcastGameState(true);
     }
   },
 
@@ -1246,7 +1273,7 @@ export const networkState = $state({
       networkState.gameState.environments[envId].backgroundImage = url;
     }
     networkState.addLog('Background map image updated.');
-    networkState.broadcastGameState();
+    networkState.broadcastGameState(true);
   },
 
   updateBackgroundImageOpacity(opacity) {
@@ -1262,7 +1289,7 @@ export const networkState = $state({
       networkState.gameState.environments[envId].backgroundImageOpacity = networkState.gameState.backgroundImageOpacity;
     }
 
-    networkState.broadcastGameState();
+    networkState.broadcastGameState(true);
   },
 
   changeEnvironment(envId) {
@@ -1315,7 +1342,7 @@ export const networkState = $state({
     }
 
     networkState.addLog(`Environment switched to: ${newEnv.name}`);
-    networkState.broadcastGameState();
+    networkState.broadcastGameState(true);
   },
 
   addEnvironment(name, theme = 'soul-society') {
@@ -1367,7 +1394,7 @@ export const networkState = $state({
       }
     }
 
-    networkState.broadcastGameState();
+    networkState.broadcastGameState(true);
   },
 
   deleteEnvironment(envId) {
@@ -1392,7 +1419,7 @@ export const networkState = $state({
 
     delete networkState.gameState.environments[envId];
     networkState.addLog(`Deleted environment: ${envName}`);
-    networkState.broadcastGameState();
+    networkState.broadcastGameState(true);
   },
 
   renameEnvironment(envId, newName) {
@@ -1401,7 +1428,7 @@ export const networkState = $state({
       const oldName = networkState.gameState.environments[envId].name;
       networkState.gameState.environments[envId].name = newName.trim();
       networkState.addLog(`Renamed environment from "${oldName}" to "${newName.trim()}"`);
-      networkState.broadcastGameState();
+      networkState.broadcastGameState(true);
     }
   },
 
@@ -1417,7 +1444,7 @@ export const networkState = $state({
       networkState.gameState.environments[envId].theme = theme;
     }
     networkState.addLog(`Visual theme updated to: ${theme.toUpperCase()}`);
-    networkState.broadcastGameState();
+    networkState.broadcastGameState(true);
   },
 
   // Add Piece
@@ -1453,7 +1480,7 @@ export const networkState = $state({
     networkState.setPiece(id, newPiece);
     networkState.selectedPieceId = id;
     networkState.addLog(`Added new piece: ${name} (${pieceClass})`);
-    networkState.broadcastGameState();
+    networkState.broadcastGameState(true);
   },
 
   moveCharacterToEnvironment(pieceId, envId) {
@@ -1491,7 +1518,7 @@ export const networkState = $state({
     networkState.selectedPieceId = pieceId;
     networkState.selectedEnvironmentId = null;
     networkState.addLog(`Moved ${piece.name} to environment: ${targetEnv.name}`);
-    networkState.broadcastGameState();
+    networkState.broadcastGameState(true);
   },
 
   // Update piece character sheet (HP, notes) — available to GM and clients for own chars
@@ -1522,7 +1549,7 @@ export const networkState = $state({
       if (typeof updates.dead === 'boolean') piece.dead = updates.dead;
       if (typeof updates.stunned === 'boolean') piece.stunned = updates.stunned;
       networkState.addLog(`Updated sheet: ${piece.name}`);
-      networkState.broadcastGameState();
+      networkState.broadcastGameState(true);
     } else if (networkState.role === 'client') {
       // Optimistic local update + send intent to host
       if (typeof updates.hp === 'number') {
@@ -1591,7 +1618,7 @@ export const networkState = $state({
       piece.z = targetZ;
       piece.animationEffect = { type: 'dash', timestamp: Date.now() };
       networkState.addLog(`${piece.name} usou Dash para (${targetX}, ${targetZ})! EP restante: ${piece.ep}`);
-      networkState.broadcastGameState();
+      networkState.broadcastGameState(true);
     } else if (networkState.role === 'client') {
       // Optimistic local EP deduction
       piece.ep = Math.max(0, currentEp - dashEpCost);
@@ -1652,7 +1679,7 @@ export const networkState = $state({
     };
 
     networkState.addLog(`Built house: ${networkState.gameState.pieces[id].name} (${safeWidth}x${safeDepth}, ${safeFloors} floors)`);
-    networkState.broadcastGameState();
+    networkState.broadcastGameState(true);
   },
 
   updateHouseFloor(houseId, floor) {
@@ -1664,7 +1691,7 @@ export const networkState = $state({
     if (networkState.role === 'host') {
       house.activeFloor = safeFloor;
       networkState.addLog(`House floor changed: ${house.name} -> floor ${safeFloor}`);
-      networkState.broadcastGameState();
+      networkState.broadcastGameState(true);
       return;
     }
 
@@ -1803,7 +1830,7 @@ export const networkState = $state({
       if (parsed && typeof parsed === 'object' && parsed.pieces) {
         networkState.gameState = parsed;
         networkState.addLog('Session loaded successfully!');
-        networkState.broadcastGameState();
+        networkState.broadcastGameState(true);
       } else {
         networkState.addLog('FAILED: Invalid session file structure.');
       }
@@ -1857,7 +1884,7 @@ export const networkState = $state({
         networkState.selectedPieceId = null;
       }
       networkState.addLog(`Deleted piece: ${piece.name}`);
-      networkState.broadcastGameState();
+      networkState.broadcastGameState(true);
     }
   },
 
@@ -1899,14 +1926,14 @@ export const networkState = $state({
     }
     networkState.gameState.activePopupImage = url;
     networkState.addLog(`Shared fullscreen image: ${url}`);
-    networkState.broadcastGameState();
+    networkState.broadcastGameState(true);
   },
 
   // Clear popup image
   clearPopupImage() {
     if (networkState.role !== 'host') return;
     networkState.gameState.activePopupImage = '';
-    networkState.broadcastGameState();
+    networkState.broadcastGameState(true);
   },
 
   // ── Turn System ──────────────────────────────────────────────────
@@ -1941,7 +1968,7 @@ export const networkState = $state({
     const logDetails = entries.map((e, i) => `${i + 1}. ${e.name} (${e.initiative})`).join(' | ');
     networkState.addLog(`Initiative rolled! Order: ${logDetails}`);
     networkState.addLog(`>> Turn 1: ${entries[0]?.name || '?'}`);
-    networkState.broadcastGameState();
+    networkState.broadcastGameState(true);
   },
 
   nextTurn() {
@@ -2431,7 +2458,7 @@ export const networkState = $state({
               }
               networkState.deletePiece(args.id);
               networkState.addLog(`[MCP] Deleted piece: ${piece.name || args.id}`);
-              networkState.broadcastGameState();
+              networkState.broadcastGameState(true);
               ws.send(JSON.stringify({ requestId, message: `Piece deleted.` }));
             }
             else {
