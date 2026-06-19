@@ -83,26 +83,23 @@
     return indices;
   });
 
-  // Theme-derived lighting colors
+  // Neutral lighting for accurate piece colors
   const ambientColor = $derived.by(() => {
     const theme = envConfig.theme || 'soul-society';
-    if (theme === 'hueco-mundo') return '#0f1d24'; // Cold cyan
-    if (theme === 'karakura-town') return '#24120a'; // Warm sunset orange/amber
-    return '#1e1b4b'; // Deep purple-blue
+    if (theme === 'hueco-mundo') return '#e2e8f0'; // Slightly cool white
+    if (theme === 'karakura-town') return '#fef3c7'; // Slightly warm white
+    return '#ffffff'; // Neutral white
   });
 
   const ambientIntensity = $derived.by(() => {
-    const theme = envConfig.theme || 'soul-society';
-    if (theme === 'hueco-mundo') return 1.8;
-    if (theme === 'karakura-town') return 1.6;
-    return 1.5;
+    return 1.0;
   });
 
   const directionalColor = $derived.by(() => {
     const theme = envConfig.theme || 'soul-society';
-    if (theme === 'hueco-mundo') return '#8b5cf6'; // Violet directional light
-    if (theme === 'karakura-town') return '#f97316'; // Sunset orange
-    return '#38bdf8'; // Sky blue
+    if (theme === 'hueco-mundo') return '#f8fafc';
+    if (theme === 'karakura-town') return '#fffbeb';
+    return '#ffffff';
   });
 
   const gridColor = $derived.by(() => {
