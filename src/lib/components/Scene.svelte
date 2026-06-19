@@ -275,25 +275,49 @@
     };
   }
 
+  function isMeshVisibleInScene(obj) {
+    let node = obj;
+    while (node) {
+      if (node.visible === false) return false;
+      node = node.parent;
+    }
+    return true;
+  }
+
+  function isPieceRaycastable(pieceId) {
+    const piece = networkState.getPiece(pieceId);
+    if (!piece || piece.visibleOnMap === false) return false;
+
+    const pieceFloor = Math.round((piece.y || 0) / 2.0) + 1;
+    return pieceFloor <= networkState.currentViewLevel;
+  }
+
+  function collectPieceRaycastCandidates() {
+    const candidates = [];
+    scene.traverse((obj) => {
+      if (!obj.isMesh || !isMeshVisibleInScene(obj)) return;
+
+      let node = obj;
+      while (node) {
+        if (node.userData && node.userData.pieceId) {
+          if (isPieceRaycastable(node.userData.pieceId)) {
+            candidates.push({ mesh: obj, pieceId: node.userData.pieceId, pieceClass: node.userData.pieceClass });
+          }
+          break;
+        }
+        node = node.parent;
+      }
+    });
+    return candidates;
+  }
+
   function getPieceHit(e) {
     const pointer = getCanvasPointer(e);
     if (!pointer) return null;
 
     raycaster.setFromCamera(pointer, camera.current);
 
-    const candidates = [];
-    scene.traverse((obj) => {
-      if (!obj.isMesh) return;
-
-      let node = obj;
-      while (node) {
-        if (node.userData && node.userData.pieceId) {
-          candidates.push({ mesh: obj, pieceId: node.userData.pieceId, pieceClass: node.userData.pieceClass });
-          break;
-        }
-        node = node.parent;
-      }
-    });
+    const candidates = collectPieceRaycastCandidates();
 
     const intersects = raycaster.intersectObjects(candidates.map(c => c.mesh), false);
     if (intersects.length === 0) return null;
@@ -679,7 +703,7 @@
               -((e.clientY - canvas.getBoundingClientRect().top) / canvas.getBoundingClientRect().height) * 2 + 1
             );
             raycaster.setFromCamera(mouse, camera.current);
-            const candidates = [];
+            const candidates = collectPieceRaycastCandidates();
             const gizmoMeshes = [];
             scene.traverse((obj) => {
               if (obj.isMesh) {
@@ -688,10 +712,6 @@
                   if (node.userData) {
                     if (node.userData.isGizmo) {
                       gizmoMeshes.push(obj);
-                      break;
-                    }
-                    if (node.userData.pieceId) {
-                      candidates.push({ mesh: obj, pieceId: node.userData.pieceId, pieceClass: node.userData.pieceClass });
                       break;
                     }
                   }
@@ -819,7 +839,7 @@
 
             raycaster.setFromCamera(mouse, camera.current);
 
-            const candidates = [];
+            const candidates = collectPieceRaycastCandidates();
             const hexCandidates = [];
             const gizmoMeshes = [];
             scene.traverse((obj) => {
@@ -829,10 +849,6 @@
                   if (node.userData) {
                     if (node.userData.isGizmo) {
                       gizmoMeshes.push(obj);
-                      break;
-                    }
-                    if (node.userData.pieceId) {
-                      candidates.push({ mesh: obj, pieceId: node.userData.pieceId, pieceClass: node.userData.pieceClass });
                       break;
                     }
                     if (node.userData.isMovementHex) {

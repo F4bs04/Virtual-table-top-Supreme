@@ -864,6 +864,36 @@
                 />
               </div>
               <div class="prop-row">
+                <label class="prop-label">Posição X</label>
+                <input
+                  type="number"
+                  step="1"
+                  class="prop-text-input"
+                  value={piece.x}
+                  oninput={(e) => updateStructureProp('x', e.target.value)}
+                />
+              </div>
+              <div class="prop-row">
+                <label class="prop-label">Posição Y (Altura)</label>
+                <input
+                  type="number"
+                  step="0.05"
+                  class="prop-text-input"
+                  value={piece.y ?? 0}
+                  oninput={(e) => updateStructureProp('y', e.target.value)}
+                />
+              </div>
+              <div class="prop-row">
+                <label class="prop-label">Posição Z</label>
+                <input
+                  type="number"
+                  step="1"
+                  class="prop-text-input"
+                  value={piece.z}
+                  oninput={(e) => updateStructureProp('z', e.target.value)}
+                />
+              </div>
+              <div class="prop-row">
                 <label class="prop-label">Foto</label>
                 <div style="display: flex; gap: 0.35rem; width: 100%;">
                   <label class="tex-upload-btn" style="flex: 1; margin: 0; text-align: center;">
