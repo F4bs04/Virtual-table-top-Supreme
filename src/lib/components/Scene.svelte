@@ -599,9 +599,9 @@
     }
 
     if (networkState.selectedPieceId !== null) {
-      if (networkState.activeTool === 'move') {
-        tryMoveSelectedToHex(targetX, targetZ);
-        return;
+      if (networkState.activeTool === 'move' || networkState.role === 'client') {
+        const moved = tryMoveSelectedToHex(targetX, targetZ);
+        if (moved) return;
       }
 
       if (networkState.activeTool === 'hand' || networkState.activeTool === 'select') {
