@@ -570,8 +570,8 @@
             bind:ref={matRef}
             color={textureMap ? '#ffffff' : color}
             map={textureMap}
-            transparent={networkState.getPiece(id).opacityMultiplier < 0.99 || networkState.getPiece(id).wallOpacity < 0.99}
-            opacity={networkState.getPiece(id).wallOpacity}
+            transparent={finalOpacity < 0.95}
+            opacity={finalOpacity}
             side={shapeType === 'box' || shapeType === 'sphere' ? THREE.FrontSide : THREE.DoubleSide}
           />
         </T.Mesh>
