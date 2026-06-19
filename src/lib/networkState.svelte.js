@@ -1052,6 +1052,10 @@ export const networkState = $state({
       return;
     }
     networkState.gameState.backgroundImage = url;
+    const envId = networkState.gameState.currentEnvironmentId || 'env-1';
+    if (networkState.gameState.environments && networkState.gameState.environments[envId]) {
+      networkState.gameState.environments[envId].backgroundImage = url;
+    }
     networkState.addLog('Background map image updated.');
     networkState.broadcastGameState();
   },
@@ -1219,6 +1223,10 @@ export const networkState = $state({
       return;
     }
     networkState.gameState.theme = theme;
+    const envId = networkState.gameState.currentEnvironmentId || 'env-1';
+    if (networkState.gameState.environments && networkState.gameState.environments[envId]) {
+      networkState.gameState.environments[envId].theme = theme;
+    }
     networkState.addLog(`Visual theme updated to: ${theme.toUpperCase()}`);
     networkState.broadcastGameState();
   },
