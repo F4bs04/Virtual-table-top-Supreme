@@ -20,6 +20,7 @@
   let houseFloors = $state(2);
   let houseColor = $state('#475569');
   let activeTab = $state('tokens'); // 'map' | 'tokens' | 'logs'
+  let activePieceListTab = $state('personagens'); // 'personagens' | 'objetos'
   let collapsedGroups = $state({}); // track collapsible group headers
   let newGroupName = $state('');
   let customGroups = $state([]);
@@ -44,13 +45,14 @@
       groups[g] = [];
     });
     
-    // Characters/tokens are global, objects/structures belong to the current environment.
-    const chars = Object.values(networkState.gameState.pieces || {}).filter(p => p.class === 'personagem');
-    
-    // Objects/walls/structures of the current environment
-    const envObjs = Object.values(networkState.gameState.environments?.[currentEnvId]?.pieces || {});
-    
-    const allPieces = [...chars, ...envObjs];
+    const globalPieces = Object.values(networkState.gameState.pieces || {});
+    const environmentPieces = Object.values(networkState.gameState.environments || {}).flatMap(env => (
+      Object.values(env.pieces || {}).map(piece => ({ ...piece, environmentId: piece.environmentId || env.id }))
+    ));
+
+    const allPieces = activePieceListTab === 'personagens'
+      ? [...environmentPieces, ...globalPieces].filter(p => p.class === 'personagem')
+      : Object.values(networkState.gameState.environments?.[currentEnvId]?.pieces || {}).filter(p => p.class !== 'personagem');
     
     // Filter duplicates by piece id
     const uniquePiecesMap = {};
@@ -78,6 +80,21 @@
     return groups;
   });
 
+  const characterCount = $derived.by(() => {
+    const globalPieces = Object.values(networkState.gameState.pieces || {});
+    const environmentPieces = Object.values(networkState.gameState.environments || {}).flatMap(env => Object.values(env.pieces || {}));
+    const uniqueCharacters = {};
+    [...environmentPieces, ...globalPieces].forEach(piece => {
+      if (piece.class === 'personagem') uniqueCharacters[piece.id] = piece;
+    });
+    return Object.keys(uniqueCharacters).length;
+  });
+
+  const objectCount = $derived.by(() => {
+    const currentEnvId = networkState.gameState.currentEnvironmentId || 'env-1';
+    return Object.values(networkState.gameState.environments?.[currentEnvId]?.pieces || {}).filter(p => p.class !== 'personagem').length;
+  });
+
   const selectedPiece = $derived.by(() => {
     if (!networkState.selectedPieceId) return null;
     return networkState.getPiece(networkState.selectedPieceId);
@@ -98,6 +115,7 @@
   function submitNewPiece() {
     if (!newPieceName.trim()) return;
     networkState.addPiece(newPieceName.trim(), newPieceClass, newPieceColor);
+    activePieceListTab = newPieceClass === 'personagem' ? 'personagens' : 'objetos';
     collapsedGroups = { ...collapsedGroups, 'Sem Grupo': false };
     newPieceName = '';
   }
@@ -731,7 +749,7 @@
           <!-- Tokens List -->
           <div class="glass-card texture-upload-section fade-in" style="padding: 1rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-              <h4 class="mini-title" style="margin: 0;">Lista de Tokens:</h4>
+              <h4 class="mini-title" style="margin: 0;">Lista:</h4>
               
               <!-- Add Group UI -->
               {#if networkState.role === 'host'}
@@ -759,7 +777,31 @@
               {/if}
             </div>
 
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; margin-bottom: 0.75rem;">
+              <button
+                type="button"
+                class="vtt-btn tab-btn {activePieceListTab === 'personagens' ? 'active' : ''}"
+                onclick={() => activePieceListTab = 'personagens'}
+                style="padding: 0.4rem 0.5rem; font-size: 0.72rem;"
+              >
+                Personagens ({characterCount})
+              </button>
+              <button
+                type="button"
+                class="vtt-btn tab-btn {activePieceListTab === 'objetos' ? 'active' : ''}"
+                onclick={() => activePieceListTab = 'objetos'}
+                style="padding: 0.4rem 0.5rem; font-size: 0.72rem;"
+              >
+                Objs ({objectCount})
+              </button>
+            </div>
+
             <div class="pieces-uploader" style="display: flex; flex-direction: column; gap: 0.6rem; max-height: 400px; overflow-y: auto;">
+              {#if Object.values(groupedPieces).every(groupPieces => groupPieces.length === 0)}
+                <div style="font-size: 0.76rem; color: #64748b; text-align: center; padding: 0.8rem; border: 1px dashed rgba(255,255,255,0.12); border-radius: 8px;">
+                  Nenhum {activePieceListTab === 'personagens' ? 'personagem' : 'objeto'} encontrado.
+                </div>
+              {/if}
               {#each Object.entries(groupedPieces) as [groupName, groupPieces]}
                 {@const isCollapsed = collapsedGroups[groupName]}
                 {@const allVisible = groupPieces.every(p => p.visibleOnMap !== false)}
@@ -867,6 +909,15 @@
                               </button>
 
                               {#if networkState.role === 'host'}
+                                <button
+                                  type="button"
+                                  class="file-upload-btn"
+                                  title="Duplicar e mover copia"
+                                  onclick={() => networkState.duplicatePiece(piece.id)}
+                                  style="margin: 0; padding: 0.15rem 0.35rem; font-size: 0.65rem; line-height: 1.2; cursor: pointer;"
+                                >
+                                  Dup
+                                </button>
                                 {#if piece.class === 'personagem'}
                                   <span style="display: inline-flex; align-items: center; gap: 0.2rem; color: #94a3b8; font-size: 0.65rem;">
                                     ➜

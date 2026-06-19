@@ -90,6 +90,13 @@ export const networkState = $state({
       return globalPiece;
     }
 
+    for (const env of Object.values(envs)) {
+      const envPiece = env.pieces?.[pieceId];
+      if (envPiece?.class === 'personagem') {
+        return envPiece;
+      }
+    }
+
     const selectedCharacter = networkState.gameState.pieces?.[networkState.selectedPieceId];
     const preferredEnvId = networkState.selectedEnvironmentId || selectedCharacter?.environmentId || currentEnvId;
     if (envs[preferredEnvId]?.pieces?.[pieceId]) {
@@ -142,6 +149,41 @@ export const networkState = $state({
         delete envs[envId].pieces[id];
       }
     });
+  },
+
+  duplicatePiece(pieceId) {
+    if (networkState.role !== 'host') {
+      networkState.addLog('BLOCKED: Only the Host can duplicate pieces.');
+      return null;
+    }
+
+    const source = networkState.getPiece(pieceId);
+    if (!source) return null;
+
+    const currentEnvId = networkState.gameState.currentEnvironmentId || 'env-1';
+    const sourceEnvId = source.class === 'personagem'
+      ? (source.environmentId || currentEnvId)
+      : (source.environmentId || networkState.selectedEnvironmentId || currentEnvId);
+    const idPrefix = source.class === 'personagem' ? 'p' : 'o';
+    const id = `${idPrefix}-copy-${Date.now()}`;
+    const copy = {
+      ...source,
+      id,
+      name: `${source.name || 'Token'} Copy`,
+      x: Math.min((networkState.gameState.gridSize || 24) - 1, (source.x ?? 0) + 1),
+      z: Math.min((networkState.gameState.gridSize || 24) - 1, (source.z ?? 0) + 1),
+      environmentId: sourceEnvId
+    };
+
+    networkState.setPiece(id, copy);
+    networkState.selectedPieceId = id;
+    networkState.selectedEnvironmentId = copy.class === 'personagem' ? null : sourceEnvId;
+    networkState.activeTool = 'move';
+    networkState.drawingMode = false;
+    networkState.drawingStartHex = null;
+    networkState.addLog(`Duplicated ${source.name}. Move mode active for the copy.`);
+    networkState.broadcastGameState();
+    return id;
   },
 
   // Authoritative board state
@@ -1219,9 +1261,24 @@ export const networkState = $state({
       return;
     }
 
-    const piece = networkState.gameState.pieces?.[pieceId];
+    let piece = networkState.gameState.pieces?.[pieceId];
+    let sourceEnvId = null;
+    if (!piece) {
+      for (const [candidateEnvId, env] of Object.entries(networkState.gameState.environments || {})) {
+        const envPiece = env.pieces?.[pieceId];
+        if (envPiece?.class === 'personagem') {
+          piece = envPiece;
+          sourceEnvId = candidateEnvId;
+          break;
+        }
+      }
+    }
     const targetEnv = networkState.gameState.environments?.[envId];
     if (!piece || piece.class !== 'personagem' || !targetEnv) return;
+
+    if (sourceEnvId && networkState.gameState.environments[sourceEnvId]?.pieces) {
+      delete networkState.gameState.environments[sourceEnvId].pieces[pieceId];
+    }
 
     networkState.gameState.pieces = {
       ...(networkState.gameState.pieces || {}),
