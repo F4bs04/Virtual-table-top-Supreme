@@ -9,7 +9,7 @@
   // Piece Creator state
   let newPieceName = $state('');
   let newPieceClass = $state('personagem'); // 'personagem' | 'objeto'
-  let newPieceColor = $state('#ff3e00');
+  let newPieceColor = $state('#ffffff');
   let inspectorName = $state('');
   let inspectorClass = $state('personagem');
   let inspectorColor = $state('#ffffff');

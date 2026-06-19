@@ -1,6 +1,7 @@
 import { Peer } from 'peerjs';
 import { getHexDistance } from './hexGeometry.js';
 
+let broadcastTimeout = null;
 export const networkState = $state({
   // PeerJS references
   peer: null,

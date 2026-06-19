@@ -399,7 +399,7 @@
   // Texture loading
   $effect(() => {
     if (textureUrl && shapeType !== 'imported') {
-      const loader = new THREE.TextureLoader();
+      console.log('Loading texture:', textureUrl); const loader = new THREE.TextureLoader();
       loader.load(
         textureUrl,
         (tex) => {
