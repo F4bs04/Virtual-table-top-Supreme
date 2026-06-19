@@ -451,8 +451,9 @@
     if (networkState.draggedPieceId) {
       const piece = networkState.getPiece(networkState.draggedPieceId);
       if (piece) {
+        dragTargetHex = { c, r };
         if (networkState.role === 'host' && piece.class === 'personagem') {
-          dragTargetHex = { c, r };
+          // Characters wait for the authoritative move commit on pointer release.
         } else if (piece.structureType === 'wall-line' && piece.x2 !== undefined) {
           const dx = piece.x2 - piece.x;
           const dz = piece.z2 - piece.z;
@@ -665,7 +666,7 @@
         leftClickStartPos = { x: e.clientX, y: e.clientY };
 
         // GM left-click on a piece initiates drag
-        if (networkState.role === 'host') {
+        if (networkState.role === 'host' && networkState.activeTool === 'move') {
           const canvas = document.querySelector('canvas');
           if (canvas && camera.current) {
             const mouse = new THREE.Vector2(

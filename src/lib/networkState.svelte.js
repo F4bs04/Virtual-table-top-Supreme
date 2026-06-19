@@ -529,9 +529,19 @@ export const networkState = $state({
         }
       }
       
-      piece.x = x;
-      piece.y = y;
-      piece.z = z;
+      if (piece.structureType === 'wall-line' && piece.x2 !== undefined) {
+        const dx = piece.x2 - piece.x;
+        const dz = piece.z2 - piece.z;
+        piece.x = x;
+        piece.y = y;
+        piece.z = z;
+        piece.x2 = x + dx;
+        piece.z2 = z + dz;
+      } else {
+        piece.x = x;
+        piece.y = y;
+        piece.z = z;
+      }
       networkState.addLog(`Host moved ${piece.name} to (${x}, ${y}, ${z})`);
       networkState.broadcastGameState();
     } else if (networkState.role === 'client') {
