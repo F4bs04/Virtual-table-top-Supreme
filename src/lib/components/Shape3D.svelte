@@ -389,6 +389,12 @@
       return () => groupRef.remove(modelScene);
     }
   });
+  $effect(() => {
+    if (matRef && color) {
+      matRef.color.set(color);
+      matRef.needsUpdate = true;
+    }
+  });
 
   $effect(() => {
     if (groupRef) {

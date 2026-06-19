@@ -675,7 +675,7 @@
               <input
                 type="color"
                 value={piece.color}
-                onchange={(e) => networkState.updatePieceDetails(piece.id, { color: e.target.value })}
+                oninput={(e) => networkState.updatePieceDetails(piece.id, { color: e.target.value })}
                 class="prop-color"
               />
             </div>
@@ -846,7 +846,7 @@
                 <input
                   type="color"
                   value={piece.color}
-                  onchange={(e) => networkState.updatePieceDetails(piece.id, { color: e.target.value })}
+                  oninput={(e) => networkState.updatePieceDetails(piece.id, { color: e.target.value })}
                   class="prop-color"
                 />
               </div>

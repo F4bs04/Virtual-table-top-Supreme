@@ -19,6 +19,15 @@
   const isSelected = $derived(networkState.selectedPieceId === id);
   const floorHeight = 2.0;
 
+  let matRef = $state(null);
+
+  $effect(() => {
+    if (matRef && color) {
+      matRef.color.set(color);
+      matRef.needsUpdate = true;
+    }
+  });
+
   const p1 = $derived(hexToWorld(x, z));
   const p2 = $derived(hexToWorld(x2, z2));
 
@@ -112,7 +121,7 @@
     {#if activeTexture}
       <T.MeshBasicMaterial map={activeTexture} side={THREE.DoubleSide} transparent opacity={0.95} />
     {:else}
-      <T.MeshBasicMaterial color={color} side={THREE.DoubleSide} transparent opacity={0.8} />
+      <T.MeshBasicMaterial bind:ref={matRef} color={color} side={THREE.DoubleSide} transparent opacity={0.8} />
     {/if}
   </T.Mesh>
 </T.Group>
