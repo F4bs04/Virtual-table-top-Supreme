@@ -726,7 +726,7 @@ export const networkState = $state({
   },
 
   isFloorUnderHex(c, r, yVal) {
-    return Object.values(networkState.gameState.pieces).some(p => {
+    return networkState.getAllCurrentPieces().some(p => {
       if (p.structureType !== 'floor-plane') return false;
       if (Math.abs(p.y - yVal) > 0.1) return false;
 
@@ -1351,11 +1351,18 @@ export const networkState = $state({
     }
   },
 
+  getAllCurrentPieces() {
+    const envId = networkState.gameState.currentEnvironmentId || 'env-1';
+    const envPieces = networkState.gameState.environments?.[envId]?.pieces || {};
+    const globalPieces = Object.values(networkState.gameState.pieces || {}).filter(p => (p.environmentId || 'env-1') === envId);
+    return [...globalPieces, ...Object.values(envPieces)];
+  },
+
   getHouseContainingPiece(pieceId) {
     const piece = networkState.gameState.pieces[pieceId];
     if (!piece || piece.class !== 'personagem') return null;
 
-    return Object.values(networkState.gameState.pieces).find((candidate) => {
+    return networkState.getAllCurrentPieces().find((candidate) => {
       if (candidate.structureType !== 'house') return false;
       const halfWidth = (candidate.width || 1) / 2;
       const halfDepth = (candidate.depth || candidate.width || 1) / 2;
@@ -1369,7 +1376,7 @@ export const networkState = $state({
     let minDistance = 1.0; // snap threshold in hex distance
     const activeY = (networkState.currentViewLevel - 1) * 2.0;
 
-    Object.values(networkState.gameState.pieces).forEach(p => {
+    networkState.getAllCurrentPieces().forEach(p => {
       // Only snap to structures on the current level
       if (Math.abs((p.y || 0) - activeY) > 0.1) return;
 
@@ -1418,7 +1425,7 @@ export const networkState = $state({
   getPieceRenderHeight(piece) {
     // Check if there is a stair structure that contains this piece's coordinate
     let stairHeight = null;
-    Object.values(networkState.gameState.pieces).forEach(p => {
+    networkState.getAllCurrentPieces().forEach(p => {
       if (p.structureType === 'stair' && p.x2 !== undefined) {
         // Compute distance from piece (px, pz) to stair line segment in hex coords
         const ax = p.x, az = p.z, bx = p.x2, bz = p.z2;
@@ -1479,7 +1486,7 @@ export const networkState = $state({
   },
 
   isCellBlocked(c, r) {
-    return Object.values(networkState.gameState.pieces).some(p => {
+    return networkState.getAllCurrentPieces().some(p => {
       if (p.structureType === 'house') {
         const minC = p.x - (p.width - 1) / 2;
         const maxC = p.x + (p.width - 1) / 2;

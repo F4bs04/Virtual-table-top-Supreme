@@ -466,7 +466,7 @@
       userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
     >
       <T.BoxGeometry args={[w, h * 0.75, d]} />
-      <T.MeshStandardMaterial bind:ref={matRef} color={textureMap ? '#ffffff' : color} map={textureMap} roughness={0.8} metalness={0.1} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
+      <T.MeshStandardMaterial bind:ref={matRef} color={color} map={textureMap} roughness={0.8} metalness={0.1} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
     </T.Mesh>
     {#each battlementsData as b (b.cx)}
       <T.Mesh position={[b.cx, h * 0.875, 0]}
@@ -474,7 +474,7 @@
         userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
       >
         <T.BoxGeometry args={[b.bw, b.bh, d * 0.8]} />
-        <T.MeshStandardMaterial bind:ref={matRef} color={textureMap ? '#ffffff' : color} map={textureMap} roughness={0.8} metalness={0.1} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
+        <T.MeshStandardMaterial bind:ref={matRef} color={color} map={textureMap} roughness={0.8} metalness={0.1} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
       </T.Mesh>
     {/each}
     {#if networkState.activeTool === 'move'}
@@ -493,7 +493,7 @@
       userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
     >
       <T.BoxGeometry args={[w, h, d]} />
-      <T.MeshStandardMaterial bind:ref={matRef} color={textureMap ? '#ffffff' : color} map={textureMap} roughness={0.6} metalness={0.2} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
+      <T.MeshStandardMaterial bind:ref={matRef} color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
     </T.Mesh>
     {#if networkState.activeTool === 'move'}
       <T.Mesh position={[0, h * 0.5, 0]}
@@ -511,7 +511,7 @@
       userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
     >
       <T.CylinderGeometry args={[w / 2, w / 2, h, 24]} />
-      <T.MeshStandardMaterial bind:ref={matRef} color={textureMap ? '#ffffff' : color} map={textureMap} roughness={0.6} metalness={0.2} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
+      <T.MeshStandardMaterial bind:ref={matRef} color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
     </T.Mesh>
     {#if networkState.activeTool === 'move'}
       <T.Mesh position={[0, h * 0.5, 0]}
@@ -529,7 +529,7 @@
       userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
     >
       <T.SphereGeometry args={[w / 2, 24, 24]} />
-      <T.MeshStandardMaterial bind:ref={matRef} color={textureMap ? '#ffffff' : color} map={textureMap} roughness={0.6} metalness={0.2} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
+      <T.MeshStandardMaterial bind:ref={matRef} color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
     </T.Mesh>
     {#if networkState.activeTool === 'move'}
       <T.Mesh position={[0, w / 2, 0]}
@@ -547,7 +547,7 @@
       userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
     >
       <T.ConeGeometry args={[w / 2, h, 4]} />
-      <T.MeshStandardMaterial bind:ref={matRef} color={textureMap ? '#ffffff' : color} map={textureMap} roughness={0.6} metalness={0.2} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
+      <T.MeshStandardMaterial bind:ref={matRef} color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
     </T.Mesh>
     {#if networkState.activeTool === 'move'}
       <T.Mesh position={[0, h * 0.5, 0]}
@@ -572,7 +572,7 @@
           <T.BoxGeometry args={[w, stepHeight, stepDepth * (5 - i)]} />
           <T.MeshStandardMaterial
             bind:ref={matRef}
-            color={textureMap ? '#ffffff' : color}
+            color={color}
             map={textureMap}
             transparent={finalOpacity < 0.95}
             opacity={finalOpacity}
@@ -597,7 +597,7 @@
       userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
     >
       <T.ConeGeometry args={[w / 2, h, 24]} />
-      <T.MeshStandardMaterial bind:ref={matRef} color={textureMap ? '#ffffff' : color} map={textureMap} roughness={0.6} metalness={0.2} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
+      <T.MeshStandardMaterial bind:ref={matRef} color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
     </T.Mesh>
     {#if networkState.activeTool === 'move'}
       <T.Mesh position={[0, h * 0.5, 0]}
@@ -615,7 +615,7 @@
       onpointerdown={handlePointerDown}
       userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
     >
-      <T.MeshStandardMaterial bind:ref={matRef} color={textureMap ? '#ffffff' : color} map={textureMap} roughness={0.6} metalness={0.2} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
+      <T.MeshStandardMaterial bind:ref={matRef} color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
     </T.Mesh>
     {#if networkState.activeTool === 'move'}
       <T.Mesh position={[0, h * 0.5, 0]}
