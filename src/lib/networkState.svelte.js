@@ -113,22 +113,24 @@ export const networkState = $state({
       if (!networkState.gameState.environments) {
         networkState.gameState.environments = {};
       }
-      if (!networkState.gameState.environments[envId]) {
-        networkState.gameState.environments[envId] = {
+      const currentEnv = networkState.gameState.environments[envId] || {
           id: envId,
           name: envId === 'env-1' ? 'Gotei 13 (Soul Society)' : envId === 'env-2' ? 'Karakura Town' : 'Hueco Mundo',
           theme: 'soul-society',
           backgroundImage: '',
           backgroundImageOpacity: 1.0,
           pieces: {}
-        };
-      }
-      if (!networkState.gameState.environments[envId].pieces) {
-        networkState.gameState.environments[envId].pieces = {};
-      }
-      networkState.gameState.environments[envId].pieces = {
-        ...networkState.gameState.environments[envId].pieces,
-        [id]: piece
+      };
+
+      networkState.gameState.environments = {
+        ...networkState.gameState.environments,
+        [envId]: {
+          ...currentEnv,
+          pieces: {
+            ...(currentEnv.pieces || {}),
+            [id]: piece
+          }
+        }
       };
     }
   },
