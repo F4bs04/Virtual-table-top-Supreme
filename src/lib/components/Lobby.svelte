@@ -21,9 +21,11 @@
   let houseColor = $state('#475569');
   let activeTab = $state('tokens'); // 'map' | 'tokens' | 'logs'
   let activePieceListTab = $state('personagens'); // 'personagens' | 'objetos'
+  let activePieceListPage = $state(1);
   let collapsedGroups = $state({}); // track collapsible group headers
   let newGroupName = $state('');
   let customGroups = $state([]);
+  const pieceListPageSize = 20;
 
   function addGroup() {
     const name = newGroupName.trim();
@@ -36,15 +38,8 @@
     }
   }
 
-  const groupedPieces = $derived.by(() => {
-    const groups = {};
+  const currentPieceList = $derived.by(() => {
     const currentEnvId = networkState.gameState.currentEnvironmentId || 'env-1';
-    
-    // Initialize custom groups
-    customGroups.forEach(g => {
-      groups[g] = [];
-    });
-    
     const globalPieces = Object.values(networkState.gameState.pieces || {});
     const environmentPieces = Object.values(networkState.gameState.environments || {}).flatMap(env => (
       Object.values(env.pieces || {}).map(piece => ({ ...piece, environmentId: piece.environmentId || env.id }))
@@ -60,7 +55,7 @@
       uniquePiecesMap[piece.id] = piece;
     });
     const uniquePieces = Object.values(uniquePiecesMap);
-    
+
     uniquePieces.sort((a, b) => {
       if (a.id === networkState.selectedPieceId) return -1;
       if (b.id === networkState.selectedPieceId) return 1;
@@ -70,7 +65,26 @@
       return bTime - aTime;
     });
 
-    uniquePieces.forEach(piece => {
+    return uniquePieces;
+  });
+
+  const pieceListTotalPages = $derived(Math.max(1, Math.ceil(currentPieceList.length / pieceListPageSize)));
+
+  const paginatedPieces = $derived.by(() => {
+    const safePage = Math.min(Math.max(1, activePieceListPage), pieceListTotalPages);
+    const start = (safePage - 1) * pieceListPageSize;
+    return currentPieceList.slice(start, start + pieceListPageSize);
+  });
+
+  const groupedPieces = $derived.by(() => {
+    const groups = {};
+    
+    // Initialize custom groups
+    customGroups.forEach(g => {
+      groups[g] = [];
+    });
+
+    paginatedPieces.forEach(piece => {
       const grp = piece.group?.trim() || 'Sem Grupo';
       if (!groups[grp]) {
         groups[grp] = [];
@@ -79,6 +93,17 @@
     });
     return groups;
   });
+
+  $effect(() => {
+    if (activePieceListPage > pieceListTotalPages) {
+      activePieceListPage = pieceListTotalPages;
+    }
+  });
+
+  function setPieceListTab(tab) {
+    activePieceListTab = tab;
+    activePieceListPage = 1;
+  }
 
   const characterCount = $derived.by(() => {
     const globalPieces = Object.values(networkState.gameState.pieces || {});
@@ -116,6 +141,7 @@
     if (!newPieceName.trim()) return;
     networkState.addPiece(newPieceName.trim(), newPieceClass, newPieceColor);
     activePieceListTab = newPieceClass === 'personagem' ? 'personagens' : 'objetos';
+    activePieceListPage = 1;
     collapsedGroups = { ...collapsedGroups, 'Sem Grupo': false };
     newPieceName = '';
   }
@@ -781,7 +807,7 @@
               <button
                 type="button"
                 class="vtt-btn tab-btn {activePieceListTab === 'personagens' ? 'active' : ''}"
-                onclick={() => activePieceListTab = 'personagens'}
+                onclick={() => setPieceListTab('personagens')}
                 style="padding: 0.4rem 0.5rem; font-size: 0.72rem;"
               >
                 Personagens ({characterCount})
@@ -789,15 +815,41 @@
               <button
                 type="button"
                 class="vtt-btn tab-btn {activePieceListTab === 'objetos' ? 'active' : ''}"
-                onclick={() => activePieceListTab = 'objetos'}
+                onclick={() => setPieceListTab('objetos')}
                 style="padding: 0.4rem 0.5rem; font-size: 0.72rem;"
               >
                 Objs ({objectCount})
               </button>
             </div>
 
+            {#if currentPieceList.length > pieceListPageSize}
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.75rem; padding: 0.45rem 0.55rem; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; background: rgba(0,0,0,0.18);">
+                <button
+                  type="button"
+                  class="file-upload-btn"
+                  disabled={activePieceListPage <= 1}
+                  onclick={() => activePieceListPage = Math.max(1, activePieceListPage - 1)}
+                  style="margin: 0; padding: 0.2rem 0.55rem; font-size: 0.68rem; opacity: {activePieceListPage <= 1 ? 0.45 : 1}; cursor: {activePieceListPage <= 1 ? 'not-allowed' : 'pointer'};"
+                >
+                  Anterior
+                </button>
+                <span style="font-size: 0.68rem; color: #94a3b8; font-family: monospace; text-align: center; flex: 1;">
+                  Página {activePieceListPage} / {pieceListTotalPages} · {Math.min(currentPieceList.length, ((activePieceListPage - 1) * pieceListPageSize) + 1)}-{Math.min(currentPieceList.length, activePieceListPage * pieceListPageSize)} de {currentPieceList.length}
+                </span>
+                <button
+                  type="button"
+                  class="file-upload-btn"
+                  disabled={activePieceListPage >= pieceListTotalPages}
+                  onclick={() => activePieceListPage = Math.min(pieceListTotalPages, activePieceListPage + 1)}
+                  style="margin: 0; padding: 0.2rem 0.55rem; font-size: 0.68rem; opacity: {activePieceListPage >= pieceListTotalPages ? 0.45 : 1}; cursor: {activePieceListPage >= pieceListTotalPages ? 'not-allowed' : 'pointer'};"
+                >
+                  Próxima
+                </button>
+              </div>
+            {/if}
+
             <div class="pieces-uploader" style="display: flex; flex-direction: column; gap: 0.6rem; max-height: 400px; overflow-y: auto;">
-              {#if Object.values(groupedPieces).every(groupPieces => groupPieces.length === 0)}
+              {#if currentPieceList.length === 0}
                 <div style="font-size: 0.76rem; color: #64748b; text-align: center; padding: 0.8rem; border: 1px dashed rgba(255,255,255,0.12); border-radius: 8px;">
                   Nenhum {activePieceListTab === 'personagens' ? 'personagem' : 'objeto'} encontrado.
                 </div>
