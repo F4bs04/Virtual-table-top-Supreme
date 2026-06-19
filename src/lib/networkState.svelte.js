@@ -63,10 +63,14 @@ export const networkState = $state({
 
   getPiece(pieceId) {
     if (!networkState.gameState) return null;
+    const envs = networkState.gameState.environments || {};
+    const currentEnvId = networkState.gameState.currentEnvironmentId || 'env-1';
+    if (envs[currentEnvId]?.pieces?.[pieceId]) {
+      return envs[currentEnvId].pieces[pieceId];
+    }
     if (networkState.gameState.pieces && networkState.gameState.pieces[pieceId]) {
       return networkState.gameState.pieces[pieceId];
     }
-    const envs = networkState.gameState.environments || {};
     for (const envId of Object.keys(envs)) {
       if (envs[envId].pieces && envs[envId].pieces[pieceId]) {
         return envs[envId].pieces[pieceId];
@@ -1159,9 +1163,11 @@ export const networkState = $state({
       networkState.addLog('BLOCKED: Only the Host can add pieces.');
       return;
     }
-    const id = `p-custom-${Date.now()}`;
+    const idPrefix = pieceClass === 'personagem' ? 'p' : 'o';
+    const id = `${idPrefix}-custom-${Date.now()}`;
     const midPoint = Math.floor((networkState.gameState.gridSize || 24) / 2);
-    networkState.gameState.pieces[id] = {
+    const envId = networkState.gameState.currentEnvironmentId || 'env-1';
+    const newPiece = {
       id,
       name,
       class: pieceClass,
@@ -1172,9 +1178,16 @@ export const networkState = $state({
       textureUrl: pieceClass === 'personagem' ? '/soldier.png' : '',
       hp: pieceClass === 'personagem' ? 100 : null,
       maxHp: pieceClass === 'personagem' ? 100 : null,
+      ep: pieceClass === 'personagem' ? 100 : null,
+      maxEp: pieceClass === 'personagem' ? 100 : null,
+      dashRange: pieceClass === 'personagem' ? 3 : null,
+      dashEpCost: pieceClass === 'personagem' ? 20 : null,
       notes: '',
-      photos: []
+      photos: [],
+      environmentId: envId
     };
+    networkState.setPiece(id, newPiece);
+    networkState.selectedPieceId = id;
     networkState.addLog(`Added new piece: ${name} (${pieceClass})`);
     networkState.broadcastGameState();
   },
