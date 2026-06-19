@@ -11,6 +11,7 @@ export const networkState = $state({
   error: '',
   logs: [],
   selectedPieceId: null,
+  selectedEnvironmentId: null,
   suppressNextGroundDeselect: false,
   currentViewLevel: 1, // 1 = Ground Floor, 2 = Second Floor, etc.
   drawingMode: false, // drawing active state for GM
@@ -88,16 +89,14 @@ export const networkState = $state({
     if (globalPiece?.class === 'personagem') {
       return globalPiece;
     }
-    if (envs[currentEnvId]?.pieces?.[pieceId]) {
-      return envs[currentEnvId].pieces[pieceId];
+
+    const selectedCharacter = networkState.gameState.pieces?.[networkState.selectedPieceId];
+    const preferredEnvId = networkState.selectedEnvironmentId || selectedCharacter?.environmentId || currentEnvId;
+    if (envs[preferredEnvId]?.pieces?.[pieceId]) {
+      return envs[preferredEnvId].pieces[pieceId];
     }
     if (globalPiece) {
       return globalPiece;
-    }
-    for (const envId of Object.keys(envs)) {
-      if (envs[envId].pieces && envs[envId].pieces[pieceId]) {
-        return envs[envId].pieces[pieceId];
-      }
     }
     return null;
   },
@@ -1051,17 +1050,8 @@ export const networkState = $state({
       };
     }
 
-    // 2. Save current active objects (class === 'objeto')
-    const currentObjs = {};
-    Object.keys(networkState.gameState.pieces).forEach(pId => {
-      const piece = networkState.gameState.pieces[pId];
-      if (piece && piece.class === 'objeto') {
-        currentObjs[pId] = $state.snapshot(piece);
-        delete networkState.gameState.pieces[pId];
-      }
-    });
-    networkState.gameState.environments[currentEnvId].pieces = currentObjs;
-    // Also save current background settings in the environment config
+    // 2. Save current background settings in the environment config.
+    // Objects remain isolated in environments[envId].pieces.
     networkState.gameState.environments[currentEnvId].theme = networkState.gameState.theme;
     networkState.gameState.environments[currentEnvId].backgroundImage = networkState.gameState.backgroundImage;
     networkState.gameState.environments[currentEnvId].backgroundImageOpacity = networkState.gameState.backgroundImageOpacity ?? 1.0;
@@ -1073,17 +1063,18 @@ export const networkState = $state({
       return;
     }
 
-    // 4. Load new environment's objects
-    const newPieces = newEnv.pieces || {};
-    Object.keys(newPieces).forEach(pId => {
-      networkState.gameState.pieces[pId] = $state.snapshot(newPieces[pId]);
-    });
-
-    // 5. Update background / theme
+    // 4. Update background / theme
     networkState.gameState.theme = newEnv.theme || 'soul-society';
     networkState.gameState.backgroundImage = newEnv.backgroundImage || '';
     networkState.gameState.backgroundImageOpacity = newEnv.backgroundImageOpacity ?? 1.0;
     networkState.gameState.currentEnvironmentId = envId;
+    if (networkState.selectedPieceId) {
+      const selected = networkState.getPiece(networkState.selectedPieceId);
+      if (selected?.class !== 'personagem') {
+        networkState.selectedPieceId = null;
+        networkState.selectedEnvironmentId = null;
+      }
+    }
 
     networkState.addLog(`Environment switched to: ${newEnv.name}`);
     networkState.broadcastGameState();
@@ -1097,8 +1088,6 @@ export const networkState = $state({
     if (!networkState.gameState.environments) {
       networkState.gameState.environments = {};
     }
-    
-    // Auto-save current environment before adding and switching to the new one
     const currentEnvId = networkState.gameState.currentEnvironmentId || 'env-1';
     if (!networkState.gameState.environments[currentEnvId]) {
       networkState.gameState.environments[currentEnvId] = {
@@ -1110,14 +1099,6 @@ export const networkState = $state({
         pieces: {}
       };
     }
-    const currentObjs = {};
-    Object.keys(networkState.gameState.pieces).forEach(pId => {
-      const piece = networkState.gameState.pieces[pId];
-      if (piece && piece.class === 'objeto') {
-        currentObjs[pId] = $state.snapshot(piece);
-      }
-    });
-    networkState.gameState.environments[currentEnvId].pieces = currentObjs;
     networkState.gameState.environments[currentEnvId].theme = networkState.gameState.theme;
     networkState.gameState.environments[currentEnvId].backgroundImage = networkState.gameState.backgroundImage;
     networkState.gameState.environments[currentEnvId].backgroundImageOpacity = networkState.gameState.backgroundImageOpacity ?? 1.0;
@@ -1134,20 +1115,19 @@ export const networkState = $state({
     };
 
     networkState.addLog(`Created new environment: ${networkState.gameState.environments[envId].name}`);
-    
-    // Switch to the newly created environment
-    // 1. Clear current active objects
-    Object.keys(networkState.gameState.pieces).forEach(pId => {
-      const piece = networkState.gameState.pieces[pId];
-      if (piece && piece.class === 'objeto') {
-        delete networkState.gameState.pieces[pId];
-      }
-    });
-    // 2. Apply new environment values
+
+    // Switch to the newly created environment.
     networkState.gameState.theme = theme;
     networkState.gameState.backgroundImage = '';
     networkState.gameState.backgroundImageOpacity = 1.0;
     networkState.gameState.currentEnvironmentId = envId;
+    if (networkState.selectedPieceId) {
+      const selected = networkState.getPiece(networkState.selectedPieceId);
+      if (selected?.class !== 'personagem') {
+        networkState.selectedPieceId = null;
+        networkState.selectedEnvironmentId = null;
+      }
+    }
 
     networkState.broadcastGameState();
   },
@@ -1230,6 +1210,29 @@ export const networkState = $state({
     networkState.setPiece(id, newPiece);
     networkState.selectedPieceId = id;
     networkState.addLog(`Added new piece: ${name} (${pieceClass})`);
+    networkState.broadcastGameState();
+  },
+
+  moveCharacterToEnvironment(pieceId, envId) {
+    if (networkState.role !== 'host') {
+      networkState.addLog('BLOCKED: Only the Host can move characters between environments.');
+      return;
+    }
+
+    const piece = networkState.gameState.pieces?.[pieceId];
+    const targetEnv = networkState.gameState.environments?.[envId];
+    if (!piece || piece.class !== 'personagem' || !targetEnv) return;
+
+    networkState.gameState.pieces = {
+      ...(networkState.gameState.pieces || {}),
+      [pieceId]: {
+        ...piece,
+        environmentId: envId
+      }
+    };
+    networkState.selectedPieceId = pieceId;
+    networkState.selectedEnvironmentId = null;
+    networkState.addLog(`Moved ${piece.name} to environment: ${targetEnv.name}`);
     networkState.broadcastGameState();
   },
 

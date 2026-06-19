@@ -591,6 +591,7 @@
         }
 
         networkState.selectedPieceId = null;
+        networkState.selectedEnvironmentId = null;
         networkState.dashMode = false;
       }
     }
@@ -603,6 +604,7 @@
       if (p) {
         networkState.requestMove(networkState.selectedPieceId, c, p.y || 0, r);
         networkState.selectedPieceId = null;
+        networkState.selectedEnvironmentId = null;
       }
     }
   }
@@ -613,6 +615,7 @@
       networkState.requestDash(networkState.selectedPieceId, c, r);
       networkState.dashMode = false;
       networkState.selectedPieceId = null;
+      networkState.selectedEnvironmentId = null;
     }
   }
 
@@ -637,6 +640,7 @@
       networkState.requestDash(pieceId, targetX, targetZ);
       networkState.dashMode = false;
       networkState.selectedPieceId = null;
+      networkState.selectedEnvironmentId = null;
       return true;
     }
 
@@ -645,6 +649,7 @@
 
     networkState.requestMove(pieceId, targetX, selectedPieceObj.y || 0, targetZ);
     networkState.selectedPieceId = null;
+    networkState.selectedEnvironmentId = null;
     return true;
   }
 
@@ -762,6 +767,7 @@
             networkState.draggedPieceStartHex = null;
             dragTargetHex = null;
             networkState.selectedPieceId = null;
+            networkState.selectedEnvironmentId = null;
             return;
           } else {
             // Short click: cancel drag, keep selection
@@ -870,6 +876,7 @@
                   }
                   networkState.dashMode = false;
                   networkState.selectedPieceId = foundPiece.pieceId;
+                  networkState.selectedEnvironmentId = piece.class === 'personagem' ? null : currentRenderEnvId;
                   if (piece.class === 'personagem') {
                     networkState.addLog(`Selecionado: ${piece.name}. Clique no hex vermelho para mover.`);
                   } else {
@@ -900,6 +907,7 @@
               }
 
               networkState.selectedPieceId = null;
+              networkState.selectedEnvironmentId = null;
               networkState.dashMode = false;
             }
           }

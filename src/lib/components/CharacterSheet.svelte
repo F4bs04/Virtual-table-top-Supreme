@@ -92,6 +92,7 @@
   // ── Actions ────────────────────────────────────────────────────────────────
   function close() {
     networkState.selectedPieceId = null;
+    networkState.selectedEnvironmentId = null;
   }
 
   function adjustHp(delta) {

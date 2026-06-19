@@ -44,8 +44,8 @@
       groups[g] = [];
     });
     
-    // Characters/tokens
-    const chars = Object.values(networkState.gameState.pieces || {});
+    // Characters/tokens are global, objects/structures belong to the current environment.
+    const chars = Object.values(networkState.gameState.pieces || {}).filter(p => p.class === 'personagem');
     
     // Objects/walls/structures of the current environment
     const envObjs = Object.values(networkState.gameState.environments?.[currentEnvId]?.pieces || {});
@@ -113,8 +113,9 @@
     });
   }
 
-  function selectPiece(pieceId) {
-    networkState.selectedPieceId = pieceId;
+  function selectPiece(piece) {
+    networkState.selectedPieceId = piece.id;
+    networkState.selectedEnvironmentId = piece?.class === 'personagem' ? null : (piece?.environmentId || networkState.gameState.currentEnvironmentId || 'env-1');
   }
 
   function updateSelectedPieceDetails() {
@@ -713,7 +714,7 @@
                   <strong style="display: block; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{selectedPiece.name}</strong>
                   <span style="font-size: 0.7rem; color: #64748b; text-transform: uppercase; font-family: monospace;">{selectedPiece.structureType ?? selectedPiece.class}</span>
                 </div>
-                <button class="clear-selection-btn" onclick={() => { networkState.selectedPieceId = null; }}>✕</button>
+                <button class="clear-selection-btn" onclick={() => { networkState.selectedPieceId = null; networkState.selectedEnvironmentId = null; }}>✕</button>
               </div>
               {#if selectedPiece.class === 'personagem' && selectedPiece.maxHp}
                 <div style="margin-top: 0.6rem;">
@@ -827,7 +828,7 @@
                           <div
                             class="piece-uploader-row {networkState.selectedPieceId === piece.id ? 'selected-row' : ''}"
                             style="padding: 0.35rem 0.5rem; display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.2); border-radius: 6px; cursor: pointer; border: 1px solid {networkState.selectedPieceId === piece.id ? piece.color : 'transparent'}; transition: background 0.15s;"
-                            onclick={() => selectPiece(piece.id)}
+                            onclick={() => selectPiece(piece)}
                             draggable={networkState.role === 'host'}
                             ondragstart={(e) => {
                               if (networkState.role === 'host') {
@@ -866,6 +867,21 @@
                               </button>
 
                               {#if networkState.role === 'host'}
+                                {#if piece.class === 'personagem'}
+                                  <span style="display: inline-flex; align-items: center; gap: 0.2rem; color: #94a3b8; font-size: 0.65rem;">
+                                    ➜
+                                    <select
+                                      title="Enviar personagem para cenário"
+                                      value={piece.environmentId || 'env-1'}
+                                      onchange={(e) => networkState.moveCharacterToEnvironment(piece.id, e.target.value)}
+                                      style="max-width: 92px; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(168, 85, 247, 0.45); color: #e9d5ff; border-radius: 4px; padding: 0.12rem 0.25rem; font-size: 0.65rem; outline: none;"
+                                    >
+                                      {#each Object.values(networkState.gameState.environments || {}) as env}
+                                        <option value={env.id}>{env.name}</option>
+                                      {/each}
+                                    </select>
+                                  </span>
+                                {/if}
                                 <button
                                   type="button"
                                   class="file-upload-btn"
