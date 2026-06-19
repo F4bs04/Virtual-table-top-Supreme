@@ -59,6 +59,15 @@
     });
     const uniquePieces = Object.values(uniquePiecesMap);
     
+    uniquePieces.sort((a, b) => {
+      if (a.id === networkState.selectedPieceId) return -1;
+      if (b.id === networkState.selectedPieceId) return 1;
+
+      const aTime = Number(String(a.id).match(/(\d+)$/)?.[1] ?? 0);
+      const bTime = Number(String(b.id).match(/(\d+)$/)?.[1] ?? 0);
+      return bTime - aTime;
+    });
+
     uniquePieces.forEach(piece => {
       const grp = piece.group?.trim() || 'Sem Grupo';
       if (!groups[grp]) {
@@ -138,12 +147,14 @@
       stairs: 'Escada', 'round-roof': 'Telhado Redondo', roof: 'Telhado Normal'
     };
     networkState.add3DShape(names[shapeType] || shapeType, shapeType, shapeColor, shapeSize);
+    collapsedGroups = { ...collapsedGroups, 'Sem Grupo': false };
   }
 
   async function handleModelImport(event) {
     const file = event.target.files[0];
     if (file) {
       await networkState.importModel(file);
+      collapsedGroups = { ...collapsedGroups, 'Sem Grupo': false };
       event.target.value = '';
     }
   }

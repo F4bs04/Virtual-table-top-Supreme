@@ -1835,6 +1835,7 @@ export const networkState = $state({
       environmentId: envId
     };
     networkState.setPiece(id, newShape);
+    networkState.selectedPieceId = id;
     networkState.addLog(`Added 3D shape: ${name} (${shapeType}, size: ${size})`);
     networkState.broadcastGameState();
   },
@@ -1888,6 +1889,7 @@ export const networkState = $state({
         environmentId: envId
       };
       networkState.setPiece(id, newShape);
+      networkState.selectedPieceId = id;
       networkState.addLog(`Imported 3D model: ${file.name} (${(dataUrl.length / 1024 / 1024).toFixed(1)}MB)`);
       networkState.broadcastGameState();
     } catch (err) {
