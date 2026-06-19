@@ -319,11 +319,19 @@
               <span>Friends:</span>
               <strong>{networkState.connections.length}</strong>
             </div>
-            <div class="detail-row" style="margin: 0; display: flex; justify-content: space-between; grid-column: span 2; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 0.35rem;">
+            <div class="detail-row" style="margin: 0; display: flex; justify-content: space-between; align-items: center; grid-column: span 2; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 0.35rem;">
               <span>MCP Assistant:</span>
-              <strong style="color: {networkState.mcpConnected === 'connected' ? '#22c55e' : networkState.mcpConnected === 'connecting' ? '#f59e0b' : '#ef4444'}">
-                {networkState.mcpConnected === 'connected' ? 'Connected' : networkState.mcpConnected === 'connecting' ? 'Connecting...' : 'Disconnected'}
-              </strong>
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <strong style="color: {networkState.mcpConnected === 'connected' ? '#22c55e' : networkState.mcpConnected === 'connecting' ? '#f59e0b' : '#ef4444'}">
+                  {networkState.mcpConnected === 'connected' ? 'Connected' : networkState.mcpConnected === 'connecting' ? 'Connecting...' : 'Disconnected'}
+                </strong>
+                <button
+                  onclick={() => networkState.toggleMcp()}
+                  style="font-size: 0.7rem; padding: 0.15rem 0.4rem; border-radius: 4px; cursor: pointer; background: {networkState.enableMcp ? 'rgba(239, 68, 68, 0.2)' : 'rgba(34, 197, 94, 0.2)'}; border: 1px solid {networkState.enableMcp ? '#ef4444' : '#22c55e'}; color: #fff; font-weight: bold;"
+                >
+                  {networkState.enableMcp ? 'Desligar' : 'Ligar'}
+                </button>
+              </div>
             </div>
           {/if}
         </div>
@@ -717,6 +725,24 @@
               </div>
             </div>
           {/if}
+
+          <!-- Visual / Performance Preferences (Visible to both Host and Client) -->
+          <div class="glass-card performance-info fade-in" style="padding: 1rem; margin-top: 0.75rem;">
+            <h3 class="subsection-title" style="margin-top: 0; padding-bottom: 0.25rem;">Performance</h3>
+            <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.9rem;">
+              <span>Fundo 3D (Gaussian Splat):</span>
+              <input 
+                type="checkbox" 
+                checked={networkState.showSplat} 
+                onchange={() => networkState.toggleSplat()} 
+                style="width: 1.2rem; height: 1.2rem; cursor: pointer; accent-color: #a855f7;"
+              />
+            </div>
+            <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.35rem;">
+              Desative o fundo 3D se o tabuleiro estiver travando ou lento.
+            </div>
+          </div>
+
         {:else if activeTab === 'tokens'}
           <!-- TOKENS TAB -->
           {#if networkState.role === 'host'}

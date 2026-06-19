@@ -1,6 +1,38 @@
 import { Peer } from 'peerjs';
 import { getHexDistance } from './hexGeometry.js';
 
+function safeEquals(a, b) {
+  if (a === b) return true;
+  if (a === null || b === null || a === undefined || b === undefined) return a === b;
+  const typeA = typeof a;
+  const typeB = typeof b;
+  if (typeA !== typeB) return false;
+  if (typeA !== 'object') return a === b;
+  
+  const isArrayA = Array.isArray(a);
+  const isArrayB = Array.isArray(b);
+  if (isArrayA !== isArrayB) return false;
+  if (isArrayA) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (!safeEquals(a[i], b[i])) return false;
+    }
+    return true;
+  }
+  
+  if (a instanceof Date) return b instanceof Date && a.getTime() === b.getTime();
+  
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+  
+  for (const key of keysA) {
+    if (!keysB.includes(key)) return false;
+    if (!safeEquals(a[key], b[key])) return false;
+  }
+  return true;
+}
+
 let broadcastTimeout = null;
 export const networkState = $state({
   // PeerJS references
@@ -26,9 +58,26 @@ export const networkState = $state({
   moveLockPieceId: null, // GM Move tool: piece ID that is "grabbed" and follows the mouse
   undoStack: [],
   lastAuthoritativeState: null,
+  saveUndoState() {
+    if (networkState.role !== 'host') return;
+    const snap = $state.snapshot(networkState.gameState);
+    networkState.undoStack.push(snap);
+    if (networkState.undoStack.length > 50) {
+      networkState.undoStack.shift();
+    }
+    networkState.lastAuthoritativeState = snap;
+  },
   recentTextures: [],
   mcpConnected: 'disconnected', // 'disconnected' | 'connected' | 'connecting'
   mcpSocket: null,
+  showSplat: (typeof window !== 'undefined' && localStorage.getItem('vtt_show_splat') !== 'false'),
+
+  toggleSplat() {
+    networkState.showSplat = !networkState.showSplat;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('vtt_show_splat', String(networkState.showSplat));
+    }
+  },
 
   getDefaultRecentTextures() {
     return [
@@ -144,6 +193,8 @@ export const networkState = $state({
   },
 
   deletePiece(id) {
+    if (networkState.role !== 'host') return;
+    networkState.saveUndoState();
     delete networkState.gameState.pieces[id];
     const envs = networkState.gameState.environments || {};
     Object.keys(envs).forEach(envId => {
@@ -151,6 +202,7 @@ export const networkState = $state({
         delete envs[envId].pieces[id];
       }
     });
+    networkState.broadcastGameState();
   },
 
   duplicatePiece(pieceId) {
@@ -158,6 +210,7 @@ export const networkState = $state({
       networkState.addLog('BLOCKED: Only the Host can duplicate pieces.');
       return null;
     }
+    networkState.saveUndoState();
 
     const source = networkState.getPiece(pieceId);
     if (!source) return null;
@@ -375,10 +428,11 @@ export const networkState = $state({
   // Client -> Host message handler
   _handleDataFromClient(conn, data) {
     if (data.type === 'INTENT_UPDATE_SHEET') {
-      // Client can update HP/EP, notes and states on their own character
-      const { pieceId, hp, ep, notes, dead, stunned } = data;
+      // Client can update HP/EP, notes and states on their own character, as well as appearance properties
+      const { pieceId, hp, ep, notes, dead, stunned, name, color, scale, textureUrl } = data;
       const piece = networkState.gameState.pieces[pieceId];
       if (!piece || piece.class !== 'personagem') return;
+      networkState.saveUndoState();
       // Detect HP delta to auto-trigger visual effect
       if (typeof hp === 'number') {
         const prevHp = piece.hp ?? 0;
@@ -395,11 +449,14 @@ export const networkState = $state({
       if (typeof notes === 'string') piece.notes = notes;
       if (typeof dead === 'boolean') piece.dead = dead;
       if (typeof stunned === 'boolean') piece.stunned = stunned;
+      if (typeof name === 'string' && name.trim()) piece.name = name.trim();
+      if (typeof color === 'string') piece.color = color;
+      if (typeof scale === 'number') piece.scale = scale;
+      if (typeof textureUrl === 'string') piece.textureUrl = textureUrl;
       networkState.addLog(`Client ${conn.peer} updated sheet/states for ${piece.name}`);
       networkState.broadcastGameState();
       return;
     }
-
     if (data.type === 'INTENT_DASH') {
       const { pieceId, x, z } = data;
       const piece = networkState.gameState.pieces[pieceId];
@@ -423,6 +480,7 @@ export const networkState = $state({
         conn.send({ type: 'STATE_UPDATE', gameState: $state.snapshot(networkState.gameState) });
         return;
       }
+      networkState.saveUndoState();
       piece.ep = Math.max(0, currentEp - dashEpCost);
       piece.x = x;
       piece.z = z;
@@ -462,7 +520,8 @@ export const networkState = $state({
           });
           return;
         }
-
+        
+        networkState.saveUndoState();
         piece.x = x;
         piece.y = y;
         piece.z = z;
@@ -505,10 +564,114 @@ export const networkState = $state({
     }
   },
 
-  // Host -> Client message handler
   _handleDataFromHost(data) {
     if (data.type === 'STATE_INIT' || data.type === 'STATE_UPDATE') {
-      networkState.gameState = data.gameState;
+      const newState = data.gameState;
+      if (!networkState.gameState) {
+        networkState.gameState = newState;
+        return;
+      }
+      
+      // In-place selective merge to prevent full Svelte component tear-down & WebGL lag
+      // (This updates properties on the existing reactive state object)
+      if (networkState.gameState.buildMode !== newState.buildMode) {
+        networkState.gameState.buildMode = newState.buildMode;
+      }
+      if (networkState.gameState.theme !== newState.theme) {
+        networkState.gameState.theme = newState.theme;
+      }
+      if (networkState.gameState.gridSize !== newState.gridSize) {
+        networkState.gameState.gridSize = newState.gridSize;
+      }
+      if (networkState.gameState.currentEnvironmentId !== newState.currentEnvironmentId) {
+        networkState.gameState.currentEnvironmentId = newState.currentEnvironmentId;
+      }
+      if (networkState.gameState.backgroundImage !== newState.backgroundImage) {
+        networkState.gameState.backgroundImage = newState.backgroundImage;
+      }
+      if (networkState.gameState.backgroundImageOpacity !== newState.backgroundImageOpacity) {
+        networkState.gameState.backgroundImageOpacity = newState.backgroundImageOpacity;
+      }
+      if (newState.recentRolls) {
+        networkState.gameState.recentRolls = newState.recentRolls;
+      }
+
+      // Merge environments map
+      if (newState.environments) {
+        if (!networkState.gameState.environments) networkState.gameState.environments = {};
+        for (const [envId, env] of Object.entries(newState.environments)) {
+          if (!networkState.gameState.environments[envId]) {
+            networkState.gameState.environments[envId] = env;
+          } else {
+            const targetEnv = networkState.gameState.environments[envId];
+            if (targetEnv.name !== env.name) targetEnv.name = env.name;
+            if (targetEnv.theme !== env.theme) targetEnv.theme = env.theme;
+            if (targetEnv.backgroundImage !== env.backgroundImage) targetEnv.backgroundImage = env.backgroundImage;
+            if (targetEnv.backgroundImageOpacity !== env.backgroundImageOpacity) targetEnv.backgroundImageOpacity = env.backgroundImageOpacity;
+            
+            // Merge pieces inside environments
+            if (env.pieces) {
+              if (!targetEnv.pieces) targetEnv.pieces = {};
+              // Delete old pieces
+              for (const id of Object.keys(targetEnv.pieces)) {
+                if (!env.pieces[id]) delete targetEnv.pieces[id];
+              }
+              // Update pieces
+              for (const [id, piece] of Object.entries(env.pieces)) {
+                if (!targetEnv.pieces[id]) {
+                  targetEnv.pieces[id] = piece;
+                } else {
+                  const targetPiece = targetEnv.pieces[id];
+                  for (const [k, v] of Object.entries(piece)) {
+                    if (k === 'animationEffect') {
+                      if (!targetPiece.animationEffect || targetPiece.animationEffect.timestamp !== v?.timestamp) {
+                        targetPiece.animationEffect = v;
+                      }
+                    } else if (!safeEquals(targetPiece[k], v)) {
+                      targetPiece[k] = v;
+                    }
+                  }
+                }
+              }
+            } else {
+              targetEnv.pieces = {};
+            }
+          }
+        }
+        // Delete removed environments
+        for (const id of Object.keys(networkState.gameState.environments)) {
+          if (!newState.environments[id]) delete networkState.gameState.environments[id];
+        }
+      }
+
+      // Merge pieces map (global pieces)
+      if (newState.pieces) {
+        if (!networkState.gameState.pieces) networkState.gameState.pieces = {};
+        // Delete old pieces
+        for (const id of Object.keys(networkState.gameState.pieces)) {
+          if (!newState.pieces[id]) delete networkState.gameState.pieces[id];
+        }
+        // Update pieces
+        for (const [id, piece] of Object.entries(newState.pieces)) {
+          if (!networkState.gameState.pieces[id]) {
+            networkState.gameState.pieces[id] = piece;
+          } else {
+            const targetPiece = networkState.gameState.pieces[id];
+            for (const [k, v] of Object.entries(piece)) {
+              if (k === 'animationEffect') {
+                if (!targetPiece.animationEffect || targetPiece.animationEffect.timestamp !== v?.timestamp) {
+                  targetPiece.animationEffect = v;
+                }
+              } else if (!safeEquals(targetPiece[k], v)) {
+                targetPiece[k] = v;
+              }
+            }
+          }
+        }
+      } else {
+        networkState.gameState.pieces = {};
+      }
+
       networkState.addLog(`Received Board State Update from Host.`);
     }
   },
@@ -535,21 +698,6 @@ export const networkState = $state({
     broadcastTimeout = setTimeout(() => {
       const snap = $state.snapshot(networkState.gameState);
       
-      // Check if we need to initialize lastAuthoritativeState
-      if (!networkState.lastAuthoritativeState) {
-        networkState.lastAuthoritativeState = snap;
-      } else {
-        const snapStr = JSON.stringify(snap);
-        const lastStr = JSON.stringify(networkState.lastAuthoritativeState);
-        if (snapStr !== lastStr) {
-          networkState.undoStack.push(networkState.lastAuthoritativeState);
-          if (networkState.undoStack.length > 50) {
-            networkState.undoStack.shift();
-          }
-          networkState.lastAuthoritativeState = snap;
-        }
-      }
-
       networkState.connections.forEach(conn => {
         if (conn.open) {
           conn.send({
@@ -581,6 +729,7 @@ export const networkState = $state({
         }
       }
       
+      networkState.saveUndoState();
       if (piece.structureType === 'wall-line' && piece.x2 !== undefined) {
         const dx = piece.x2 - piece.x;
         const dz = piece.z2 - piece.z;
@@ -642,10 +791,22 @@ export const networkState = $state({
     networkState.gameState.buildMode = !networkState.gameState.buildMode;
     networkState.addLog(`Build Mode toggled to: ${networkState.gameState.buildMode ? 'ON (Master can move objects)' : 'OFF'}`);
     networkState.broadcastGameState();
-  },
-
-  // Update piece texture
+  },  // Update piece texture
   updatePieceTexture(pieceId, url) {
+    if (networkState.role === 'client') {
+      const piece = networkState.getPiece(pieceId);
+      if (piece && piece.class === 'personagem') {
+        piece.textureUrl = url;
+        if (networkState.hostConnection && networkState.hostConnection.open) {
+          networkState.hostConnection.send({
+            type: 'INTENT_UPDATE_SHEET',
+            pieceId,
+            textureUrl: url
+          });
+        }
+      }
+      return;
+    }
     if (networkState.role !== 'host') {
       networkState.addLog('BLOCKED: Only the Host can change piece textures.');
       return;
@@ -657,8 +818,6 @@ export const networkState = $state({
       networkState.broadcastGameState();
     }
   },
-
-
 
   async tokenImageFileToDataUrl(file, { maxSize = 768, quality = 0.82 } = {}) {
     if (!file || !file.type?.startsWith('image/')) return '';
@@ -692,6 +851,36 @@ export const networkState = $state({
 
   // Update piece metadata from the inspector panel
   updatePieceDetails(pieceId, updates) {
+    if (networkState.role === 'client') {
+      const piece = networkState.getPiece(pieceId);
+      if (piece && piece.class === 'personagem') {
+        const payload = {};
+        if (typeof updates.name === 'string' && updates.name.trim()) {
+          piece.name = updates.name.trim();
+          payload.name = piece.name;
+        }
+        if (typeof updates.color === 'string') {
+          piece.color = updates.color;
+          payload.color = piece.color;
+        }
+        if (typeof updates.scale === 'number') {
+          piece.scale = updates.scale;
+          payload.scale = piece.scale;
+        }
+        if (typeof updates.textureUrl === 'string') {
+          piece.textureUrl = updates.textureUrl;
+          payload.textureUrl = piece.textureUrl;
+        }
+        if (networkState.hostConnection && networkState.hostConnection.open) {
+          networkState.hostConnection.send({
+            type: 'INTENT_UPDATE_SHEET',
+            pieceId,
+            ...payload
+          });
+        }
+      }
+      return;
+    }
     if (networkState.role !== 'host') {
       networkState.addLog('BLOCKED: Only the Host can edit piece details.');
       return;
@@ -1237,6 +1426,7 @@ export const networkState = $state({
       networkState.addLog('BLOCKED: Only the Host can add pieces.');
       return;
     }
+    networkState.saveUndoState();
     const idPrefix = pieceClass === 'personagem' ? 'p' : 'o';
     const id = `${idPrefix}-custom-${Date.now()}`;
     const midPoint = Math.floor((networkState.gameState.gridSize || 24) / 2);
@@ -1351,6 +1541,10 @@ export const networkState = $state({
       if (typeof updates.notes === 'string') piece.notes = updates.notes;
       if (typeof updates.dead === 'boolean') piece.dead = updates.dead;
       if (typeof updates.stunned === 'boolean') piece.stunned = updates.stunned;
+      if (typeof updates.name === 'string' && updates.name.trim()) piece.name = updates.name.trim();
+      if (typeof updates.color === 'string') piece.color = updates.color;
+      if (typeof updates.scale === 'number') piece.scale = updates.scale;
+      if (typeof updates.textureUrl === 'string') piece.textureUrl = updates.textureUrl;
       if (networkState.hostConnection && networkState.hostConnection.open) {
         networkState.hostConnection.send({
           type: 'INTENT_UPDATE_SHEET',
@@ -1359,7 +1553,11 @@ export const networkState = $state({
           ep: piece.ep,
           notes: piece.notes,
           dead: piece.dead,
-          stunned: piece.stunned
+          stunned: piece.stunned,
+          name: piece.name,
+          color: piece.color,
+          scale: piece.scale,
+          textureUrl: piece.textureUrl
         });
       }
     }
@@ -1998,6 +2196,10 @@ export const networkState = $state({
 
   connectToMCPServer() {
     if (typeof window === 'undefined') return;
+    if (!networkState.enableMcp) {
+      networkState.mcpConnected = 'disconnected';
+      return;
+    }
     if (networkState.mcpSocket && (networkState.mcpSocket.readyState === WebSocket.OPEN || networkState.mcpSocket.readyState === WebSocket.CONNECTING)) {
       return;
     }
@@ -2249,7 +2451,7 @@ export const networkState = $state({
       networkState.mcpSocket = null;
       networkState.addLog('[MCP] Disconnected from local AI assistant helper.');
       setTimeout(() => {
-        if (networkState.role === 'host') {
+        if (networkState.role === 'host' && networkState.enableMcp) {
           networkState.connectToMCPServer();
         }
       }, 5000);

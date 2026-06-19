@@ -656,13 +656,11 @@
     const selectedPieceObj = networkState.getPiece(pieceId);
     if (!selectedPieceObj) return false;
 
-    if (networkState.dashMode) {
-      const isDashHex = movementHexes.some(hex => hex.c === targetX && hex.r === targetZ && hex.isDash);
+    const isDashHex = movementHexes.some(hex => hex.c === targetX && hex.r === targetZ && hex.isDash);
+    if (networkState.dashMode || isDashHex) {
       if (!isDashHex) return false;
       networkState.requestDash(pieceId, targetX, targetZ);
       networkState.dashMode = false;
-      networkState.selectedPieceId = null;
-      networkState.selectedEnvironmentId = null;
       return true;
     }
 
@@ -994,12 +992,13 @@
   color={directionalColor} 
   castShadow
 />
-
 <!-- Gaussian Splat Immersive Background -->
-<SplatBackground 
-  position={[gridSize / 2, -0.5, gridSize / 2]} 
-  scale={[5, 5, 5]} 
-/>
+{#if networkState.showSplat}
+  <SplatBackground 
+    position={[gridSize / 2, -0.5, gridSize / 2]} 
+    scale={[5, 5, 5]} 
+  />
+{/if}
 
 <!-- Hex Grid Line segments -->
 {#key hexGridPoints.length + '-' + networkState.currentViewLevel}

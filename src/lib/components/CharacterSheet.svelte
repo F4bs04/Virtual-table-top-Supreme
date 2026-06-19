@@ -130,7 +130,7 @@
   }
 
   async function uploadTextureFromInput(e) {
-    if (!piece || !canEdit) return;
+    if (!piece || !canEditSheet) return;
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -149,7 +149,7 @@
   }
 
   async function handlePhotoUpload(e) {
-    if (!piece || !canEdit) return;
+    if (!piece || !canEditSheet) return;
     const files = Array.from(e.target.files);
     try {
       const uploadedPhotos = [];
@@ -167,14 +167,13 @@
       e.target.value = '';
     }
   }
-
   function setMainPhoto(photoUrl) {
-    if (!piece || !canEdit) return;
+    if (!piece || !canEditSheet) return;
     networkState.updatePieceDetails(piece.id, { textureUrl: photoUrl });
   }
 
   function applyGalleryTexture(item, closePopup) {
-    if (!piece || !canEdit) return;
+    if (!piece || !canEditSheet) return;
     const path = item?.path || item?.url || item?.textureUrl || '';
     if (!path) {
       networkState.addLog('Textura inválida na galeria.');
@@ -186,7 +185,7 @@
   }
 
   function removePhoto(index) {
-    if (!piece || !canEdit) return;
+    if (!piece || !canEditSheet) return;
     const photos = [...(piece.photos ?? [])];
     photos.splice(index, 1);
     networkState.updatePieceSheet(piece.id, { photos });
@@ -247,7 +246,7 @@
       <section class="sheet-section">
         <div class="section-title-row">
           <h3 class="section-label">📸 Fotos</h3>
-          {#if canEdit}
+          {#if canEditSheet}
             <label class="add-photo-btn" title="Adicionar fotos">
               + Adicionar
               <input type="file" accept="image/*" multiple onchange={handlePhotoUpload} />
@@ -266,7 +265,7 @@
           {#each (piece.photos ?? []) as photo, i}
             <div class="photo-thumb">
               <img src={photo} alt={`foto ${i + 1}`} onclick={() => setMainPhoto(photo)} />
-              {#if canEdit}
+              {#if canEditSheet}
                 <button class="remove-photo" onclick={() => removePhoto(i)} title="Remover">✕</button>
               {/if}
             </div>
@@ -844,7 +843,7 @@
         <section class="sheet-section">
           <h3 class="section-label">⚙️ Propriedades</h3>
           <div class="prop-grid">
-            {#if canEdit}
+            {#if canEditSheet}
               <div class="prop-row">
                 <label class="prop-label">Nome</label>
                 <input
@@ -863,6 +862,8 @@
                   class="prop-color"
                 />
               </div>
+            {/if}
+            {#if canEdit}
               <div class="prop-row">
                 <label class="prop-label">Posição X</label>
                 <input
@@ -893,6 +894,8 @@
                   oninput={(e) => updateStructureProp('z', e.target.value)}
                 />
               </div>
+            {/if}
+            {#if canEditSheet}
               <div class="prop-row">
                 <label class="prop-label">Foto</label>
                 <div style="display: flex; gap: 0.35rem; width: 100%;">
@@ -914,8 +917,6 @@
                   </button>
                 </div>
               </div>
-            {/if}
-            {#if canEditSheet}
               <div class="prop-row">
                 <label class="prop-label">Andar</label>
                 <select
@@ -940,8 +941,6 @@
                   <option value="6">6º Andar</option>
                 </select>
               </div>
-            {/if}
-            {#if canEdit}
               <div class="prop-row">
                 <label class="prop-label">Escala</label>
                 <div class="prop-input-row">

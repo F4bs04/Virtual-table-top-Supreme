@@ -1,6 +1,7 @@
 <script>
   import { T, useTask, useThrelte } from '@threlte/core';
   import { networkState } from '../networkState.svelte.js';
+  import { loadSharedTexture } from '../textureCache.js';
   import * as THREE from 'three';
 
   // Svelte 5 Props
@@ -42,13 +43,10 @@
   let stunnedTexture = $state(null);
 
   $effect(() => {
-    const loader = new THREE.TextureLoader();
-    loader.load('/death_state.png', (tex) => {
-      tex.colorSpace = THREE.SRGBColorSpace;
+    loadSharedTexture('/death_state.png', (tex) => {
       deadTexture = tex;
     });
-    loader.load('/Stun_icon.png', (tex) => {
-      tex.colorSpace = THREE.SRGBColorSpace;
+    loadSharedTexture('/Stun_icon.png', (tex) => {
       stunnedTexture = tex;
     });
   });
@@ -328,7 +326,6 @@
     return tex;
   }
 
-  // Effect to manage default texture creation
   $effect(() => {
     defaultTexture = createDefaultAvatar(name, color, pieceClass === 'objeto');
     if (!textureUrl) {
@@ -340,17 +337,13 @@
     };
   });
 
-  // Effect to load custom textureUrl reactively when updated by Host
   $effect(() => {
     if (textureUrl) {
-      const loader = new THREE.TextureLoader();
-      loader.load(
+      loadSharedTexture(
         textureUrl,
         (tex) => {
-          tex.colorSpace = THREE.SRGBColorSpace;
           activeTexture = tex;
         },
-        undefined,
         (err) => {
           console.error(`Error loading texture for ${name}:`, err);
           activeTexture = defaultTexture;
@@ -368,7 +361,6 @@
     activeTexture.offset.x = flipX ? 1 : 0;
     activeTexture.needsUpdate = true;
   });
-
 
   // Handle Selection click with role-based authority rules
   function handlePointerDown(e) {
