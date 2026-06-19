@@ -1,16 +1,9 @@
 <script>
   import { networkState } from '../networkState.svelte.js';
+  import { compressImage } from '../imageCompressor.js';
 
   let showTexturePopup = $state(false);
   let showBleachPopup = $state(false);
-
-  const standardTextures = [
-    { name: 'Black Brick', path: '/Model/textures/Black_brick.png' },
-    { name: 'Brick Texture', path: '/Model/textures/Bricktexture.png' },
-    { name: 'Gray Brick', path: '/Model/textures/Bricktexture_gray.png' },
-    { name: 'Concrete', path: '/Model/textures/concrete.png' },
-    { name: 'Wood Floor', path: '/Model/textures/wood_floor.png' }
-  ];
 
   const bleachCollection = [
     { name: 'Arrancar 1 Jaliel', path: '/Model/bleach Collection/Arrancar 1 Jaliel.png' },
@@ -141,8 +134,11 @@
     if (!file) return;
 
     try {
-      const dataUrl = await networkState.tokenImageFileToDataUrl(file);
-      if (dataUrl) networkState.updatePieceTexture(piece.id, dataUrl);
+      const dataUrl = await compressImage(file, 1024, 1024, 0.7);
+      if (dataUrl) {
+        networkState.updatePieceTexture(piece.id, dataUrl);
+        networkState.addRecentTexture('Upload (' + file.name.substring(0,10) + ')', dataUrl);
+      }
     } catch (err) {
       console.error('Erro ao carregar imagem do token:', err);
       networkState.addLog('Erro ao carregar imagem do token. Tente uma imagem menor ou outro formato.');
@@ -157,7 +153,7 @@
     try {
       const uploadedPhotos = [];
       for (const file of files) {
-        const dataUrl = await networkState.tokenImageFileToDataUrl(file);
+        const dataUrl = await compressImage(file, 1024, 1024, 0.7);
         if (dataUrl) uploadedPhotos.push(dataUrl);
       }
       if (uploadedPhotos.length > 0) {
@@ -963,12 +959,16 @@
   <div class="sheet-popup-overlay" onclick={() => showTexturePopup = false}>
     <div class="sheet-popup-card" onclick={(e) => e.stopPropagation()}>
       <div class="popup-title-row">
-        <h4>🎨 Texturas Padrão</h4>
+        <h4>🎨 Texturas Recentes</h4>
         <button class="popup-close-x" onclick={() => showTexturePopup = false}>✕</button>
       </div>
       <div class="popup-grid-container">
-        {#each standardTextures as tex}
-          <button class="popup-grid-item" onclick={() => { networkState.updatePieceTexture(piece.id, tex.path); showTexturePopup = false; }}>
+        {#each networkState.recentTextures as tex}
+          <button class="popup-grid-item" onclick={() => { 
+            networkState.updatePieceTexture(piece.id, tex.path); 
+            networkState.addRecentTexture(tex.name, tex.path);
+            showTexturePopup = false; 
+          }}>
             <img src={tex.path} alt={tex.name} class="popup-item-thumb" />
             <span class="popup-item-name">{tex.name}</span>
           </button>
@@ -991,7 +991,11 @@
       </div>
       <div class="popup-grid-container bleach-grid">
         {#each bleachCollection as item}
-          <button class="popup-grid-item" onclick={() => { networkState.updatePieceTexture(piece.id, item.path); showBleachPopup = false; }}>
+          <button class="popup-grid-item" onclick={() => { 
+            networkState.updatePieceTexture(piece.id, item.path); 
+            networkState.addRecentTexture(item.name, item.path);
+            showBleachPopup = false; 
+          }}>
             <img src={item.path} alt={item.name} class="popup-item-thumb character-thumb" />
             <span class="popup-item-name">{item.name}</span>
           </button>

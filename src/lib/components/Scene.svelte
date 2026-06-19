@@ -17,7 +17,7 @@
   import * as THREE from 'three';
 
   const currentRenderEnvId = $derived.by(() => {
-    const selectedPiece = networkState.gameState.pieces[networkState.selectedPieceId];
+    const selectedPiece = networkState.getPiece(networkState.selectedPieceId);
     if (selectedPiece && selectedPiece.class === 'personagem' && selectedPiece.environmentId) {
       return selectedPiece.environmentId;
     }
@@ -168,7 +168,7 @@
   let hoveredHex = $state(null); // { c, r }
   let dragTargetHex = $state(null); // final hex preview while right-dragging a character
 
-  const selectedPiece = $derived(networkState.selectedPieceId ? networkState.gameState.pieces[networkState.selectedPieceId] : null);
+  const selectedPiece = $derived(networkState.selectedPieceId ? networkState.getPiece(networkState.selectedPieceId) : null);
 
   $effect(() => {
     if (typeof window !== 'undefined') {
@@ -452,7 +452,7 @@
     hoveredHex = { c, r };
 
     if (networkState.draggedPieceId) {
-      const piece = networkState.gameState.pieces[networkState.draggedPieceId];
+      const piece = networkState.getPiece(networkState.draggedPieceId);
       if (piece) {
         if (networkState.role === 'host' && piece.class === 'personagem') {
           dragTargetHex = { c, r };
@@ -601,7 +601,7 @@
   function handleRedHexClick(e, c, r) {
     e?.stopPropagation();
     if (networkState.selectedPieceId !== null) {
-      const p = networkState.gameState.pieces[networkState.selectedPieceId];
+      const p = networkState.getPiece(networkState.selectedPieceId);
       if (p) {
         networkState.requestMove(networkState.selectedPieceId, c, p.y || 0, r);
         networkState.selectedPieceId = null;
@@ -630,7 +630,7 @@
     const pieceId = networkState.selectedPieceId;
     if (pieceId === null) return false;
 
-    const selectedPieceObj = networkState.gameState.pieces[pieceId];
+    const selectedPieceObj = networkState.getPiece(pieceId);
     if (!selectedPieceObj) return false;
 
     if (networkState.dashMode) {
@@ -709,7 +709,7 @@
               }
               const found = candidates.find(c => c.mesh === hitMesh);
               if (found) {
-                const piece = networkState.gameState.pieces[found.pieceId];
+                const piece = networkState.getPiece(found.pieceId);
                 if (piece) {
                   networkState.draggedPieceId = found.pieceId;
                   networkState.draggedPieceStartHex = { c: piece.x, r: piece.z };
@@ -747,7 +747,7 @@
         if (networkState.draggedPieceId) {
           const pieceId = networkState.draggedPieceId;
           if (elapsed >= 350 || dist >= 15) {
-            const piece = networkState.gameState.pieces[pieceId];
+            const piece = networkState.getPiece(pieceId);
             const startHex = networkState.draggedPieceStartHex;
             if (piece && startHex) {
               const targetC = dragTargetHex?.c ?? piece.x;
@@ -767,7 +767,7 @@
             return;
           } else {
             // Short click: cancel drag, keep selection
-            const piece = networkState.gameState.pieces[pieceId];
+            const piece = networkState.getPiece(pieceId);
             const startHex = networkState.draggedPieceStartHex;
             if (piece && startHex) {
               if (piece.structureType === 'wall-line' && piece.x2 !== undefined) {
@@ -861,7 +861,7 @@
               // 2. Piece clicked -> select
               const foundPiece = candidates.find(c => c.mesh === hitMesh);
               if (foundPiece) {
-                const piece = networkState.gameState.pieces[foundPiece.pieceId];
+                const piece = networkState.getPiece(foundPiece.pieceId);
                 if (piece) {
                   if (networkState.role === 'client' && piece.class !== 'personagem') {
                     return;
@@ -920,7 +920,7 @@
         // Cancel GM move lock
         if (networkState.moveLockPieceId) {
           // Restore piece to start hex
-          const piece = networkState.gameState.pieces[networkState.moveLockPieceId];
+          const piece = networkState.getPiece(networkState.moveLockPieceId);
           const start = networkState.draggedPieceStartHex;
           if (piece && start) { piece.x = start.c; piece.z = start.r; }
           networkState.moveLockPieceId = null;

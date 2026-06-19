@@ -23,6 +23,7 @@
   } = $props();
 
   let activeTexture = $state(null);
+  let matRef = $state(null);
   let isHovered = $state(false);
 
   const isSelected = $derived(networkState.selectedPieceId === id);
@@ -43,6 +44,33 @@
 
   // Dynamic geometry generation with openings (holes)
   let geometry = $state(null);
+
+  function applyBoxUV(geom) {
+    geom.computeBoundingBox();
+    const pos = geom.attributes.position;
+    const norm = geom.attributes.normal;
+    if (!pos || !norm) return;
+    const uvArray = new Float32Array(pos.count * 2);
+    for (let i = 0; i < pos.count; i++) {
+      const nx = Math.abs(norm.getX(i));
+      const ny = Math.abs(norm.getY(i));
+      const nz = Math.abs(norm.getZ(i));
+      const x = pos.getX(i);
+      const y = pos.getY(i);
+      const z = pos.getZ(i);
+      let u, v;
+      if (ny > nx && ny > nz) {
+        u = x; v = z;
+      } else if (nx > ny && nx > nz) {
+        u = z; v = y;
+      } else {
+        u = x; v = y;
+      }
+      uvArray[i * 2] = u;
+      uvArray[i * 2 + 1] = v;
+    }
+    geom.setAttribute('uv', new THREE.BufferAttribute(uvArray, 2));
+  }
 
   $effect(() => {
     const currentLength = length;
@@ -86,6 +114,7 @@
         bevelEnabled: false
       });
       newGeom.translate(0, 0, -currentThickness / 2);
+      applyBoxUV(newGeom);
       
       geometry = newGeom;
 
@@ -103,21 +132,27 @@
 
   // Load texture reactively
   $effect(() => {
+    console.log('[WallLine] textureUrl effect triggered:', textureUrl ? textureUrl.substring(0, 30) + '...' : 'none');
     if (textureUrl) {
       const loader = new THREE.TextureLoader();
       loader.load(
         textureUrl,
         (tex) => {
+          console.log('[WallLine] texture loaded successfully');
           tex.colorSpace = THREE.SRGBColorSpace;
           tex.wrapS = THREE.RepeatWrapping;
           tex.wrapT = THREE.RepeatWrapping;
           const rep = Number(textureRepeat) || 1;
           tex.repeat.set(length * rep, height * rep);
+          if (matRef) {
+            matRef.map = tex;
+            matRef.needsUpdate = true;
+          }
           activeTexture = tex;
         },
         undefined,
         (err) => {
-          console.error("Error loading wall line texture:", err);
+          console.error("[WallLine] Error loading wall line texture:", err);
           activeTexture = null;
         }
       );
@@ -180,6 +215,7 @@
       {geometry}
     >
       <T.MeshBasicMaterial
+        bind:ref={matRef}
         color={activeTexture ? '#ffffff' : color}
         map={activeTexture}
         side={wallMaterialSide}

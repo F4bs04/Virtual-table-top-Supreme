@@ -1,4 +1,5 @@
 <script>
+  import { compressImage } from '../imageCompressor.js';
   import { networkState } from '../networkState.svelte.js';
 
   let customHostId = $state('');
@@ -151,7 +152,7 @@
     const file = event.target.files[0];
     if (file) {
       try {
-        const dataUrl = await networkState.tokenImageFileToDataUrl(file);
+        const dataUrl = await compressImage(file, 1024, 1024, 0.7);
         if (dataUrl) networkState.updatePieceTexture(pieceId, dataUrl);
       } catch (err) {
         console.error('Erro ao carregar imagem do token:', err);
@@ -163,15 +164,19 @@
   }
 
   // Handle custom background image upload
-  function handleBackgroundUpload(event) {
+  async function handleBackgroundUpload(event) {
     const file = event.target.files[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        networkState.updateBackgroundImage(e.target.result);
-      };
-      reader.readAsDataURL(file);
-      event.target.value = '';
+      try {
+        // High resolution limit (4K) for background maps to preserve detail
+        const dataUrl = await compressImage(file, 4096, 4096, 0.85);
+        if (dataUrl) networkState.updateBackgroundImage(dataUrl);
+      } catch (err) {
+        console.error('Erro ao carregar fundo:', err);
+        networkState.addLog('Erro ao carregar fundo. Tente uma imagem com tamanho menor.');
+      } finally {
+        event.target.value = '';
+      }
     }
   }
 

@@ -26,6 +26,7 @@
   let loadError = $state(false);
   let groupRef = $state(null);
   let textureMap = $state(null);
+  let matRef = $state(null);
 
   // Gizmo States
   let ringHovered = $state(false);
@@ -40,6 +41,7 @@
   let isElevating = $state(false);
   let startElevPointerY = 0;
   let startElevY = 0;
+  let startMouseY = 0;
 
   let isTranslatingX = $state(false);
   let startXPointerX = 0;
@@ -75,26 +77,23 @@
   }
 
   function handleWindowRotateMove(e) {
-    if (!isRotating) return;
-    const center3D = new THREE.Vector3(x, y, z);
-    center3D.project(camera.current);
-    const centerX = (center3D.x * 0.5 + 0.5) * window.innerWidth;
-    const centerY = (-(center3D.y * 0.5) + 0.5) * window.innerHeight;
-    
+    if (!networkState.draggedPieceId) return;
+    const centerX = window.innerWidth / 2;
+    const centerY = window.innerHeight / 2;
     const currentAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX);
     const delta = currentAngle - startAngle;
     const newRot = startRotation - delta;
-    networkState.gameState.pieces[id].rotation = newRot;
+    const piece = networkState.getPiece(id);
+    if (piece) piece.rotation = newRot;
   }
 
   function handleWindowRotateEnd(e) {
-    if (!isRotating) return;
-    isRotating = false;
+    e.preventDefault();
     networkState.draggedPieceId = null;
     window.removeEventListener('pointermove', handleWindowRotateMove);
     window.removeEventListener('pointerup', handleWindowRotateEnd);
     networkState.broadcastGameState();
-    networkState.addLog('Rotação concluída.');
+    networkState.addLog(`Objeto girado`);
   }
 
   // Window handlers for elevation (Y Axis)
@@ -103,32 +102,41 @@
     e.stopPropagation();
     isElevating = true;
     startElevY = y;
-    startElevPointerY = e.nativeEvent.clientY;
-    networkState.draggedPieceId = id; // disable orbit controls
+    startMouseY = e.nativeEvent.clientY;
+    networkState.draggedPieceId = id;
     networkState.addLog('Ajustando altura do objeto...');
 
     window.addEventListener('pointermove', handleWindowElevMove);
     window.addEventListener('pointerup', handleWindowElevEnd);
   }
 
-  // Vertical movement fix: naturally translates vertical cursor delta
   function handleWindowElevMove(e) {
-    if (!isElevating) return;
-    const dy = e.clientY - startElevPointerY;
+    if (!networkState.draggedPieceId) return;
+    const dy = e.clientY - startMouseY;
     const sens = 0.8 / (camera.current?.zoom || 40);
     const deltaY = -dy * sens;
     const newY = Math.max(0, startElevY + deltaY);
-    networkState.gameState.pieces[id].y = newY;
+    const piece = networkState.getPiece(id);
+    if (piece) piece.y = newY;
   }
 
   function handleWindowElevEnd(e) {
-    if (!isElevating) return;
-    isElevating = false;
+    e.preventDefault();
     networkState.draggedPieceId = null;
     window.removeEventListener('pointermove', handleWindowElevMove);
     window.removeEventListener('pointerup', handleWindowElevEnd);
     networkState.broadcastGameState();
-    networkState.addLog(`Altura do objeto ajustada para ${y.toFixed(2)}`);
+    networkState.addLog(`Elevação do objeto ajustada`);
+  }
+
+  // Helper to project screen delta to world coordinates for translation
+  function screenDeltaToWorld(dx, dy) {
+    if (!camera.current) return new THREE.Vector3();
+    const v = new THREE.Vector3(dx, -dy, 0);
+    v.unproject(camera.current);
+    const origin = new THREE.Vector3(0, 0, 0);
+    origin.unproject(camera.current);
+    return v.sub(origin).multiplyScalar(20); // Arbitrary scaling for feel
   }
 
   // Window handlers for Translation X (Blender style camera space projection)
@@ -394,7 +402,7 @@
           tex.colorSpace = THREE.SRGBColorSpace;
           tex.wrapS = THREE.RepeatWrapping;
           tex.wrapT = THREE.RepeatWrapping;
-          textureMap = tex;
+          if (matRef) { matRef.map = tex; matRef.needsUpdate = true; } textureMap = tex;
         },
         undefined,
         () => { textureMap = null; }
@@ -454,7 +462,7 @@
       userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
     >
       <T.BoxGeometry args={[w, h * 0.75, d]} />
-      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.8} metalness={0.1} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
+      <T.MeshStandardMaterial bind:ref={matRef} color={textureMap ? '#ffffff' : color} map={textureMap} roughness={0.8} metalness={0.1} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
     </T.Mesh>
     {#each battlementsData as b (b.cx)}
       <T.Mesh position={[b.cx, h * 0.875, 0]}
@@ -462,7 +470,7 @@
         userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
       >
         <T.BoxGeometry args={[b.bw, b.bh, d * 0.8]} />
-        <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.8} metalness={0.1} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
+        <T.MeshStandardMaterial bind:ref={matRef} color={textureMap ? '#ffffff' : color} map={textureMap} roughness={0.8} metalness={0.1} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
       </T.Mesh>
     {/each}
     {#if networkState.activeTool === 'move'}
@@ -481,7 +489,7 @@
       userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
     >
       <T.BoxGeometry args={[w, h, d]} />
-      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
+      <T.MeshStandardMaterial bind:ref={matRef} color={textureMap ? '#ffffff' : color} map={textureMap} roughness={0.6} metalness={0.2} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
     </T.Mesh>
     {#if networkState.activeTool === 'move'}
       <T.Mesh position={[0, h * 0.5, 0]}
@@ -499,7 +507,7 @@
       userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
     >
       <T.CylinderGeometry args={[w / 2, w / 2, h, 24]} />
-      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
+      <T.MeshStandardMaterial bind:ref={matRef} color={textureMap ? '#ffffff' : color} map={textureMap} roughness={0.6} metalness={0.2} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
     </T.Mesh>
     {#if networkState.activeTool === 'move'}
       <T.Mesh position={[0, h * 0.5, 0]}
@@ -517,7 +525,7 @@
       userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
     >
       <T.SphereGeometry args={[w / 2, 24, 24]} />
-      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
+      <T.MeshStandardMaterial bind:ref={matRef} color={textureMap ? '#ffffff' : color} map={textureMap} roughness={0.6} metalness={0.2} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
     </T.Mesh>
     {#if networkState.activeTool === 'move'}
       <T.Mesh position={[0, w / 2, 0]}
@@ -535,7 +543,7 @@
       userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
     >
       <T.ConeGeometry args={[w / 2, h, 4]} />
-      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
+      <T.MeshStandardMaterial bind:ref={matRef} color={textureMap ? '#ffffff' : color} map={textureMap} roughness={0.6} metalness={0.2} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
     </T.Mesh>
     {#if networkState.activeTool === 'move'}
       <T.Mesh position={[0, h * 0.5, 0]}
@@ -558,7 +566,14 @@
           userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
         >
           <T.BoxGeometry args={[w, stepHeight, stepDepth * (5 - i)]} />
-          <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
+          <T.MeshStandardMaterial
+            bind:ref={matRef}
+            color={textureMap ? '#ffffff' : color}
+            map={textureMap}
+            transparent={networkState.getPiece(id).opacityMultiplier < 0.99 || networkState.getPiece(id).wallOpacity < 0.99}
+            opacity={networkState.getPiece(id).wallOpacity}
+            side={shapeType === 'box' || shapeType === 'sphere' ? THREE.FrontSide : THREE.DoubleSide}
+          />
         </T.Mesh>
       {/each}
       {#if networkState.activeTool === 'move'}
@@ -578,7 +593,7 @@
       userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
     >
       <T.ConeGeometry args={[w / 2, h, 24]} />
-      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
+      <T.MeshStandardMaterial bind:ref={matRef} color={textureMap ? '#ffffff' : color} map={textureMap} roughness={0.6} metalness={0.2} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
     </T.Mesh>
     {#if networkState.activeTool === 'move'}
       <T.Mesh position={[0, h * 0.5, 0]}
@@ -596,7 +611,7 @@
       onpointerdown={handlePointerDown}
       userData={{ pieceId: id, pieceClass: 'objeto', structureId: id }}
     >
-      <T.MeshStandardMaterial color={color} map={textureMap} roughness={0.6} metalness={0.2} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
+      <T.MeshStandardMaterial bind:ref={matRef} color={textureMap ? '#ffffff' : color} map={textureMap} roughness={0.6} metalness={0.2} transparent={finalOpacity < 0.95} opacity={finalOpacity} side={isCutAway ? THREE.BackSide : THREE.DoubleSide} />
     </T.Mesh>
     {#if networkState.activeTool === 'move'}
       <T.Mesh position={[0, h * 0.5, 0]}
@@ -688,3 +703,5 @@
     </T.Group>
   {/if}
 </T.Group>
+
+

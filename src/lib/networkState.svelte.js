@@ -24,6 +24,41 @@ export const networkState = $state({
   moveLockPieceId: null, // GM Move tool: piece ID that is "grabbed" and follows the mouse
   undoStack: [],
   lastAuthoritativeState: null,
+  recentTextures: [],
+
+  loadRecentTextures() {
+    try {
+      const stored = localStorage.getItem('vtt_recent_textures');
+      if (stored) {
+        networkState.recentTextures = JSON.parse(stored);
+      } else {
+        // default textures on first load
+        networkState.recentTextures = [
+          { name: 'Black Brick', path: '/Model/textures/Black_brick.png' },
+          { name: 'Brick Texture', path: '/Model/textures/Bricktexture.png' },
+          { name: 'Gray Brick', path: '/Model/textures/Bricktexture_gray.png' },
+          { name: 'Concrete', path: '/Model/textures/concrete.png' },
+          { name: 'Wood Floor', path: '/Model/textures/wood_floor.png' }
+        ];
+      }
+    } catch (e) {
+      console.error('Failed to load recent textures:', e);
+    }
+  },
+
+  addRecentTexture(name, path) {
+    // Avoid duplicates, move to front
+    networkState.recentTextures = networkState.recentTextures.filter(t => t.path !== path);
+    networkState.recentTextures.unshift({ name, path });
+    if (networkState.recentTextures.length > 20) {
+      networkState.recentTextures.pop();
+    }
+    try {
+      localStorage.setItem('vtt_recent_textures', JSON.stringify(networkState.recentTextures));
+    } catch (e) {
+      console.error('Failed to save recent textures:', e);
+    }
+  },
 
   getPiece(pieceId) {
     if (!networkState.gameState) return null;
@@ -530,6 +565,8 @@ export const networkState = $state({
     }
   },
 
+
+
   async tokenImageFileToDataUrl(file, { maxSize = 768, quality = 0.82 } = {}) {
     if (!file || !file.type?.startsWith('image/')) return '';
 
@@ -813,7 +850,7 @@ export const networkState = $state({
       networkState.addLog('BLOCKED: Only the Host can modify wall openings.');
       return;
     }
-    const wall = networkState.gameState.pieces[wallId];
+    const wall = networkState.getPiece(wallId);
     if (!wall || wall.structureType !== 'wall-line') return;
 
     if (!wall.openings) wall.openings = [];
@@ -839,7 +876,7 @@ export const networkState = $state({
       networkState.addLog('BLOCKED: Only the Host can modify wall openings.');
       return;
     }
-    const wall = networkState.gameState.pieces[wallId];
+    const wall = networkState.getPiece(wallId);
     if (!wall || !wall.openings) return;
 
     wall.openings = wall.openings.filter(op => op.id !== openingId);
@@ -852,7 +889,7 @@ export const networkState = $state({
       networkState.addLog('BLOCKED: Only the Host can modify wall openings.');
       return;
     }
-    const wall = networkState.gameState.pieces[wallId];
+    const wall = networkState.getPiece(wallId);
     if (!wall || !wall.openings) return;
 
     const op = wall.openings.find(o => o.id === openingId);
@@ -879,7 +916,7 @@ export const networkState = $state({
       return;
     }
 
-    const wall = networkState.gameState.pieces[wallId];
+    const wall = networkState.getPiece(wallId);
     if (!wall || !wall.openings) return;
 
     const op = wall.openings.find(o => o.id === openingId);
@@ -1825,3 +1862,5 @@ if (typeof window !== 'undefined') {
     }, 500);
   }
 }
+
+networkState.loadRecentTextures();

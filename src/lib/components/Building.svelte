@@ -25,6 +25,7 @@
 
   let isHovered = $state(false);
   let activeTexture = $state(null);
+  let matRef = $state(null);
 
   const isSelected = $derived(networkState.selectedPieceId === id);
   const floorHeight = 2.0; // floor level height step
@@ -44,6 +45,10 @@
           tex.wrapT = THREE.RepeatWrapping;
           const rep = Number(textureRepeat) || 1;
           tex.repeat.set(width * rep, buildingHeight * rep);
+          if (matRef) {
+            matRef.map = tex;
+            matRef.needsUpdate = true;
+          }
           activeTexture = tex;
         },
         undefined,
@@ -126,6 +131,7 @@
   >
     <T.BoxGeometry args={[width, buildingHeight, depth]} />
     <T.MeshBasicMaterial 
+      bind:ref={matRef}
       color={activeTexture ? '#ffffff' : color} 
       map={activeTexture}
       side={wallMaterialSide} 
