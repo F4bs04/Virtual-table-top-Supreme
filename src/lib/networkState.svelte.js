@@ -104,7 +104,10 @@ export const networkState = $state({
 
   setPiece(id, piece) {
     if (piece.class === 'personagem') {
-      networkState.gameState.pieces[id] = piece;
+      networkState.gameState.pieces = {
+        ...(networkState.gameState.pieces || {}),
+        [id]: piece
+      };
     } else {
       const envId = piece.environmentId || networkState.gameState.currentEnvironmentId || 'env-1';
       if (!networkState.gameState.environments) {
@@ -123,7 +126,10 @@ export const networkState = $state({
       if (!networkState.gameState.environments[envId].pieces) {
         networkState.gameState.environments[envId].pieces = {};
       }
-      networkState.gameState.environments[envId].pieces[id] = piece;
+      networkState.gameState.environments[envId].pieces = {
+        ...networkState.gameState.environments[envId].pieces,
+        [id]: piece
+      };
     }
   },
 

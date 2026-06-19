@@ -89,6 +89,7 @@
   function submitNewPiece() {
     if (!newPieceName.trim()) return;
     networkState.addPiece(newPieceName.trim(), newPieceClass, newPieceColor);
+    collapsedGroups = { ...collapsedGroups, 'Sem Grupo': false };
     newPieceName = '';
   }
 
