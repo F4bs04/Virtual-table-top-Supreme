@@ -627,8 +627,6 @@
       const p = networkState.getPiece(networkState.selectedPieceId);
       if (p) {
         networkState.requestMove(networkState.selectedPieceId, c, p.y || 0, r);
-        networkState.selectedPieceId = null;
-        networkState.selectedEnvironmentId = null;
       }
     }
   }
@@ -672,8 +670,6 @@
     if (!isMoveHex && !(networkState.role === 'host' && networkState.activeTool === 'move')) return false;
 
     networkState.requestMove(pieceId, targetX, selectedPieceObj.y || 0, targetZ);
-    networkState.selectedPieceId = null;
-    networkState.selectedEnvironmentId = null;
     return true;
   }
 
