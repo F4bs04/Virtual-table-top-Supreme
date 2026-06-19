@@ -21,7 +21,7 @@
   let houseColor = $state('#475569');
   let activeTab = $state('tokens'); // 'map' | 'tokens' | 'logs'
   let activePieceListTab = $state('personagens'); // 'personagens' | 'objetos'
-  let activePieceListPage = $state(1);
+  let groupPages = $state({});
   let collapsedGroups = $state({}); // track collapsible group headers
   let newGroupName = $state('');
   let customGroups = $state([]);
@@ -68,14 +68,6 @@
     return uniquePieces;
   });
 
-  const pieceListTotalPages = $derived(Math.max(1, Math.ceil(currentPieceList.length / pieceListPageSize)));
-
-  const paginatedPieces = $derived.by(() => {
-    const safePage = Math.min(Math.max(1, activePieceListPage), pieceListTotalPages);
-    const start = (safePage - 1) * pieceListPageSize;
-    return currentPieceList.slice(start, start + pieceListPageSize);
-  });
-
   const groupedPieces = $derived.by(() => {
     const groups = {};
     
@@ -84,7 +76,7 @@
       groups[g] = [];
     });
 
-    paginatedPieces.forEach(piece => {
+    currentPieceList.forEach(piece => {
       const grp = piece.group?.trim() || 'Sem Grupo';
       if (!groups[grp]) {
         groups[grp] = [];
@@ -94,15 +86,22 @@
     return groups;
   });
 
-  $effect(() => {
-    if (activePieceListPage > pieceListTotalPages) {
-      activePieceListPage = pieceListTotalPages;
-    }
-  });
-
   function setPieceListTab(tab) {
     activePieceListTab = tab;
-    activePieceListPage = 1;
+    groupPages = {};
+  }
+
+  function getGroupPage(groupName, totalItems) {
+    const totalPages = Math.max(1, Math.ceil(totalItems / pieceListPageSize));
+    return Math.min(Math.max(1, groupPages[groupName] || 1), totalPages);
+  }
+
+  function setGroupPage(groupName, page, totalItems) {
+    const totalPages = Math.max(1, Math.ceil(totalItems / pieceListPageSize));
+    groupPages = {
+      ...groupPages,
+      [groupName]: Math.min(Math.max(1, page), totalPages)
+    };
   }
 
   const characterCount = $derived.by(() => {
@@ -141,7 +140,7 @@
     if (!newPieceName.trim()) return;
     networkState.addPiece(newPieceName.trim(), newPieceClass, newPieceColor);
     activePieceListTab = newPieceClass === 'personagem' ? 'personagens' : 'objetos';
-    activePieceListPage = 1;
+    groupPages = { ...groupPages, 'Sem Grupo': 1 };
     collapsedGroups = { ...collapsedGroups, 'Sem Grupo': false };
     newPieceName = '';
   }
@@ -822,32 +821,6 @@
               </button>
             </div>
 
-            {#if currentPieceList.length > pieceListPageSize}
-              <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.75rem; padding: 0.45rem 0.55rem; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; background: rgba(0,0,0,0.18);">
-                <button
-                  type="button"
-                  class="file-upload-btn"
-                  disabled={activePieceListPage <= 1}
-                  onclick={() => activePieceListPage = Math.max(1, activePieceListPage - 1)}
-                  style="margin: 0; padding: 0.2rem 0.55rem; font-size: 0.68rem; opacity: {activePieceListPage <= 1 ? 0.45 : 1}; cursor: {activePieceListPage <= 1 ? 'not-allowed' : 'pointer'};"
-                >
-                  Anterior
-                </button>
-                <span style="font-size: 0.68rem; color: #94a3b8; font-family: monospace; text-align: center; flex: 1;">
-                  Página {activePieceListPage} / {pieceListTotalPages} · {Math.min(currentPieceList.length, ((activePieceListPage - 1) * pieceListPageSize) + 1)}-{Math.min(currentPieceList.length, activePieceListPage * pieceListPageSize)} de {currentPieceList.length}
-                </span>
-                <button
-                  type="button"
-                  class="file-upload-btn"
-                  disabled={activePieceListPage >= pieceListTotalPages}
-                  onclick={() => activePieceListPage = Math.min(pieceListTotalPages, activePieceListPage + 1)}
-                  style="margin: 0; padding: 0.2rem 0.55rem; font-size: 0.68rem; opacity: {activePieceListPage >= pieceListTotalPages ? 0.45 : 1}; cursor: {activePieceListPage >= pieceListTotalPages ? 'not-allowed' : 'pointer'};"
-                >
-                  Próxima
-                </button>
-              </div>
-            {/if}
-
             <div class="pieces-uploader" style="display: flex; flex-direction: column; gap: 0.6rem; max-height: 400px; overflow-y: auto;">
               {#if currentPieceList.length === 0}
                 <div style="font-size: 0.76rem; color: #64748b; text-align: center; padding: 0.8rem; border: 1px dashed rgba(255,255,255,0.12); border-radius: 8px;">
@@ -857,6 +830,10 @@
               {#each Object.entries(groupedPieces) as [groupName, groupPieces]}
                 {@const isCollapsed = collapsedGroups[groupName]}
                 {@const allVisible = groupPieces.every(p => p.visibleOnMap !== false)}
+                {@const groupTotalPages = Math.max(1, Math.ceil(groupPieces.length / pieceListPageSize))}
+                {@const groupPage = getGroupPage(groupName, groupPieces.length)}
+                {@const groupStart = (groupPage - 1) * pieceListPageSize}
+                {@const visibleGroupPieces = groupPieces.slice(groupStart, groupStart + pieceListPageSize)}
                 <div class="group-wrapper" 
                   style="border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; background: rgba(0,0,0,0.15); overflow: hidden; transition: border-color 0.2s;"
                   ondragover={(e) => {
@@ -917,7 +894,32 @@
                           Arraste tokens aqui para agrupar
                         </div>
                       {:else}
-                        {#each groupPieces as piece (piece.id)}
+                        {#if groupPieces.length > pieceListPageSize}
+                          <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.45rem; padding: 0.25rem 0.35rem 0.45rem; border-bottom: 1px solid rgba(255,255,255,0.05); margin-bottom: 0.2rem;">
+                            <button
+                              type="button"
+                              class="file-upload-btn"
+                              disabled={groupPage <= 1}
+                              onclick={() => setGroupPage(groupName, groupPage - 1, groupPieces.length)}
+                              style="margin: 0; padding: 0.15rem 0.45rem; font-size: 0.65rem; opacity: {groupPage <= 1 ? 0.45 : 1}; cursor: {groupPage <= 1 ? 'not-allowed' : 'pointer'};"
+                            >
+                              Anterior
+                            </button>
+                            <span style="font-size: 0.65rem; color: #94a3b8; font-family: monospace; text-align: center; flex: 1;">
+                              Página {groupPage} / {groupTotalPages} · {groupStart + 1}-{Math.min(groupPieces.length, groupStart + pieceListPageSize)} de {groupPieces.length}
+                            </span>
+                            <button
+                              type="button"
+                              class="file-upload-btn"
+                              disabled={groupPage >= groupTotalPages}
+                              onclick={() => setGroupPage(groupName, groupPage + 1, groupPieces.length)}
+                              style="margin: 0; padding: 0.15rem 0.45rem; font-size: 0.65rem; opacity: {groupPage >= groupTotalPages ? 0.45 : 1}; cursor: {groupPage >= groupTotalPages ? 'not-allowed' : 'pointer'};"
+                            >
+                              Próxima
+                            </button>
+                          </div>
+                        {/if}
+                        {#each visibleGroupPieces as piece (piece.id)}
                           {@const isPieceVisible = piece.visibleOnMap !== false}
                           <div
                             class="piece-uploader-row {networkState.selectedPieceId === piece.id ? 'selected-row' : ''}"
