@@ -65,11 +65,15 @@ export const networkState = $state({
     if (!networkState.gameState) return null;
     const envs = networkState.gameState.environments || {};
     const currentEnvId = networkState.gameState.currentEnvironmentId || 'env-1';
+    const globalPiece = networkState.gameState.pieces?.[pieceId];
+    if (globalPiece?.class === 'personagem') {
+      return globalPiece;
+    }
     if (envs[currentEnvId]?.pieces?.[pieceId]) {
       return envs[currentEnvId].pieces[pieceId];
     }
-    if (networkState.gameState.pieces && networkState.gameState.pieces[pieceId]) {
-      return networkState.gameState.pieces[pieceId];
+    if (globalPiece) {
+      return globalPiece;
     }
     for (const envId of Object.keys(envs)) {
       if (envs[envId].pieces && envs[envId].pieces[pieceId]) {
