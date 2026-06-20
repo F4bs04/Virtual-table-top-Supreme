@@ -270,6 +270,7 @@ export const networkState = $state({
 
   // Authoritative board state
   gameState: {
+    gameModeActive: false,
     buildMode: false,
     gridSize: 24,
     theme: 'soul-society',
@@ -601,6 +602,9 @@ export const networkState = $state({
       }
       
       // In-place selective merge to prevent full Svelte component tear-down & WebGL lag
+      if (newState.gameModeActive !== undefined && networkState.gameState.gameModeActive !== newState.gameModeActive) {
+        networkState.gameState.gameModeActive = newState.gameModeActive;
+      }
       if (newState.buildMode !== undefined && networkState.gameState.buildMode !== newState.buildMode) {
         networkState.gameState.buildMode = newState.buildMode;
       }
@@ -867,6 +871,28 @@ export const networkState = $state({
     
     networkState.gameState.buildMode = !networkState.gameState.buildMode;
     networkState.addLog(`Build Mode toggled to: ${networkState.gameState.buildMode ? 'ON (Master can move objects)' : 'OFF'}`);
+    networkState.broadcastGameState(true);
+  },
+  
+  // Toggle gameModeActive
+  toggleGameMode() {
+    if (networkState.role !== 'host') {
+      networkState.addLog('BLOCKED: Only the Host (Master) can toggle Game Mode.');
+      return;
+    }
+    
+    networkState.gameState.gameModeActive = !networkState.gameState.gameModeActive;
+    networkState.addLog(`Modo Jogo (Otimizado) alterado para: ${networkState.gameState.gameModeActive ? 'ATIVADO (Performance Otimizada)' : 'DESATIVADO'}`);
+    
+    // Auto disable Gaussian splatting if Game Mode is active
+    if (networkState.gameState.gameModeActive && networkState.showSplat) {
+      networkState.showSplat = false;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('vtt_show_splat', 'false');
+      }
+      networkState.addLog('Gaussian Splatting desativado automaticamente para otimização.');
+    }
+
     networkState.broadcastGameState(true);
   },  // Update piece texture
   updatePieceTexture(pieceId, url) {

@@ -990,7 +990,7 @@
   position={[gridSize / 2, 16, gridSize / 2]} 
   intensity={2.0} 
   color={directionalColor} 
-  castShadow
+  castShadow={!networkState.gameState.gameModeActive}
 />
 <!-- Gaussian Splat Immersive Background -->
 {#if networkState.showSplat}
@@ -1017,6 +1017,7 @@
 {/key}
 
 <!-- GM Spiritual Burst Particle Effects -->
+{#if !networkState.gameState.gameModeActive}
 {#each (networkState.gameState.activeParticles || []) as burst (burst.id)}
   {@const effectType = burst.effectType || 'burst'}
   {@const age = frameTime - burst.timestamp}
@@ -1126,6 +1127,7 @@
     {/if}
   {/if}
 {/each}
+{/if}
 
 <!-- Hover Highlight: subtle thin glow ring only, no fill -->
 {#if hoveredHex}

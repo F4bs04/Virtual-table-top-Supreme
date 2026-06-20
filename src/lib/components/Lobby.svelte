@@ -371,6 +371,24 @@
               <h3 class="subsection-title" style="margin: 0; padding-bottom: 0.25rem;">Master Settings</h3>
               
               <div class="control-row">
+                <span class="control-label" style="display: flex; align-items: center; gap: 0.35rem;">🎮 Modo Jogo (Otimizado):</span>
+                <label class="toggle-container">
+                  <input 
+                    type="checkbox" 
+                    checked={networkState.gameState.gameModeActive} 
+                    onchange={() => networkState.toggleGameMode()} 
+                  />
+                  <span class="toggle-slider"></span>
+                  <span class="toggle-label">
+                    <strong>{networkState.gameState.gameModeActive ? 'ATIVADO' : 'DESATIVADO'}</strong>
+                  </span>
+                </label>
+              </div>
+              <p class="help-text" style="font-size: 0.65rem; color: #94a3b8; margin: -0.4rem 0 0.4rem 0; line-height: 1.2;">
+                Otimiza a performance desativando sombras, animações de tokens e efeitos de partículas complexos.
+              </p>
+
+              <div class="control-row">
                 <span class="control-label">Build Mode:</span>
                 <label class="toggle-container">
                   <input 

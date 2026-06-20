@@ -113,6 +113,23 @@
       meshRef.quaternion.copy(camera.current.quaternion);
     }
 
+    if (networkState.gameState.gameModeActive) {
+      currentX = x;
+      currentY = y;
+      currentZ = z;
+      startX = x;
+      startY = y;
+      startZ = z;
+      lastTargetX = x;
+      lastTargetY = y;
+      lastTargetZ = z;
+      animProgress = 1.0;
+      animationType = null;
+      visualY = 0;
+      overlayColor = isSelected ? '#ffffff' : '#dddddd';
+      return;
+    }
+
     if (animationType === 'dash') {
       dashElapsed = Date.now() - animationStart;
       dashT = Math.min(1.0, dashElapsed / 400);
@@ -432,7 +449,7 @@
       </T.Mesh>
 
       <!-- Ghost 1 (Afterimage) -->
-      {#if animationType === 'dash' && animProgress < 0.95 && animProgress > 0.05}
+      {#if animationType === 'dash' && animProgress < 0.95 && animProgress > 0.05 && !networkState.gameState.gameModeActive}
         <T.Mesh 
           scale={[1.2 * scale, 1.2 * scale, 1]}
           position={[ghost1Offset.x, 0.6 * scale, ghost1Offset.z]}
@@ -450,7 +467,7 @@
       {/if}
 
       <!-- Ghost 2 (Afterimage) -->
-      {#if animationType === 'dash' && animProgress < 0.85 && animProgress > 0.15}
+      {#if animationType === 'dash' && animProgress < 0.85 && animProgress > 0.15 && !networkState.gameState.gameModeActive}
         <T.Mesh 
           scale={[1.2 * scale, 1.2 * scale, 1]}
           position={[ghost2Offset.x, 0.6 * scale, ghost2Offset.z]}
