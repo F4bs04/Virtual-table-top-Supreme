@@ -29,6 +29,41 @@ function safeEquals(a, b) {
   return true;
 }
 
+function safeSnapshot(value, stripLarge = true) {
+  if (value === null || value === undefined) return value;
+  if (typeof value !== 'object') return value;
+  if (value instanceof Date) return new Date(value.getTime());
+  
+  if (Array.isArray(value)) {
+    return value.map(item => safeSnapshot(item, stripLarge));
+  }
+  
+  const res = {};
+  for (const key of Object.keys(value)) {
+    if (stripLarge) {
+      if (key === 'backgroundImage' && typeof value[key] === 'string' && value[key].startsWith('data:')) {
+        res[key] = '';
+        continue;
+      }
+      if (key === 'photos') {
+        res[key] = [];
+        continue;
+      }
+      if (key === 'textureUrl' && typeof value[key] === 'string' && value[key].startsWith('data:')) {
+        res[key] = '';
+        continue;
+      }
+    } else {
+      if (key === 'backgroundImage' || key === 'textureUrl') {
+        res[key] = value[key];
+        continue;
+      }
+    }
+    res[key] = safeSnapshot(value[key], stripLarge);
+  }
+  return res;
+}
+
 let broadcastTimeout = null;
 export const networkState = $state({
   // PeerJS references
@@ -56,38 +91,7 @@ export const networkState = $state({
   lastAuthoritativeState: null,
   saveUndoState() {
     if (networkState.role !== 'host') return;
-    const snap = $state.snapshot(networkState.gameState);
-    
-    // Strip large base64 assets from undo snapshots to save RAM and CPU
-    const stripPiece = (piece) => {
-      if (piece) {
-        delete piece.photos;
-        if (piece.textureUrl && piece.textureUrl.startsWith('data:')) {
-          delete piece.textureUrl;
-        }
-      }
-    };
-    if (snap.backgroundImage && snap.backgroundImage.startsWith('data:')) {
-      delete snap.backgroundImage;
-    }
-    if (snap.pieces) {
-      for (const piece of Object.values(snap.pieces)) {
-        stripPiece(piece);
-      }
-    }
-    if (snap.environments) {
-      for (const env of Object.values(snap.environments)) {
-        if (env.backgroundImage && env.backgroundImage.startsWith('data:')) {
-          delete env.backgroundImage;
-        }
-        if (env.pieces) {
-          for (const piece of Object.values(env.pieces)) {
-            stripPiece(piece);
-          }
-        }
-      }
-    }
-
+    const snap = safeSnapshot(networkState.gameState, true);
     networkState.undoStack.push(snap);
     if (networkState.undoStack.length > 50) {
       networkState.undoStack.shift();
@@ -375,7 +379,7 @@ export const networkState = $state({
       // Send initial state to newly joined client
       conn.send({
         type: 'STATE_INIT',
-        gameState: $state.snapshot(networkState.gameState)
+        gameState: safeSnapshot(networkState.gameState, false)
       });
     });
 
@@ -496,17 +500,17 @@ export const networkState = $state({
       const currentEp = piece.ep ?? 0;
       if (dist > dashRange) {
         networkState.addLog(`BLOCKED: Dash range exceeded (${dist}/${dashRange} hexes).`);
-        conn.send({ type: 'STATE_UPDATE', gameState: $state.snapshot(networkState.gameState) });
+        conn.send({ type: 'STATE_UPDATE', gameState: safeSnapshot(networkState.gameState, true) });
         return;
       }
       if (currentEp < dashEpCost) {
         networkState.addLog(`BLOCKED: Not enough EP for dash (${currentEp}/${dashEpCost}).`);
-        conn.send({ type: 'STATE_UPDATE', gameState: $state.snapshot(networkState.gameState) });
+        conn.send({ type: 'STATE_UPDATE', gameState: safeSnapshot(networkState.gameState, true) });
         return;
       }
       if (networkState.isCellBlocked(x, z, piece)) {
         networkState.addLog(`BLOCKED: Dash destination is blocked by a wall.`);
-        conn.send({ type: 'STATE_UPDATE', gameState: $state.snapshot(networkState.gameState) });
+        conn.send({ type: 'STATE_UPDATE', gameState: safeSnapshot(networkState.gameState, true) });
         return;
       }
       networkState.saveUndoState();
@@ -535,7 +539,7 @@ export const networkState = $state({
           networkState.addLog(`BLOCKED: Client ${conn.peer} tried to move ${piece.name} by ${dist} hexes (limit is 1).`);
           conn.send({
             type: 'STATE_UPDATE',
-            gameState: $state.snapshot(networkState.gameState)
+            gameState: safeSnapshot(networkState.gameState, true)
           });
           return;
         }
@@ -545,7 +549,7 @@ export const networkState = $state({
           networkState.addLog(`BLOCKED: Client ${conn.peer} tried to move ${piece.name} into a wall at (${x}, ${z}).`);
           conn.send({
             type: 'STATE_UPDATE',
-            gameState: $state.snapshot(networkState.gameState)
+            gameState: safeSnapshot(networkState.gameState, true)
           });
           return;
         }
@@ -560,7 +564,7 @@ export const networkState = $state({
         networkState.addLog(`BLOCKED: Client ${conn.peer} tried to move object ${piece.name} without authority!`);
         conn.send({
           type: 'STATE_UPDATE',
-          gameState: $state.snapshot(networkState.gameState)
+          gameState: safeSnapshot(networkState.gameState, true)
         });
       }
     } else if (data.type === 'INTENT_TOGGLE_DOOR') {
@@ -733,7 +737,7 @@ export const networkState = $state({
     }
     const prevState = networkState.undoStack.pop();
     networkState.gameState = prevState;
-    networkState.lastAuthoritativeState = $state.snapshot(prevState);
+    networkState.lastAuthoritativeState = prevState;
     networkState.broadcastGameState(true);
     networkState.addLog('Ação desfeita (Ctrl+Z).');
   },
@@ -776,8 +780,7 @@ export const networkState = $state({
 
     clearTimeout(broadcastTimeout);
     broadcastTimeout = setTimeout(() => {
-      const snap = $state.snapshot(networkState.gameState);
-      const payloadState = (isFull && includeLargeAssets) ? snap : stripLargeAssets(snap);
+      const payloadState = safeSnapshot(networkState.gameState, !(isFull && includeLargeAssets));
       
       networkState.connections.forEach(conn => {
         if (conn.open) {
@@ -1884,7 +1887,7 @@ export const networkState = $state({
       networkState.addLog('BLOCKED: Only the Host can save the session.');
       return;
     }
-    const dataStr = JSON.stringify($state.snapshot(networkState.gameState), null, 2);
+    const dataStr = JSON.stringify(safeSnapshot(networkState.gameState, false), null, 2);
     const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
     
     const exportFileDefaultName = `bleach-vtt-session-${new Date().toISOString().slice(0,10)}.json`;
@@ -2336,7 +2339,7 @@ export const networkState = $state({
         if (type === 'MCP_GET_STATE') {
           ws.send(JSON.stringify({
             requestId,
-            gameState: $state.snapshot(networkState.gameState)
+            gameState: safeSnapshot(networkState.gameState, true)
           }));
           return;
         }
