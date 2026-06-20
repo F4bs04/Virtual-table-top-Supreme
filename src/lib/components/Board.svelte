@@ -84,10 +84,13 @@
   });
 
   $effect(() => {
-    if (networkState.role === 'client' && networkState.activeTool !== 'hand') {
-      networkState.activeTool = 'hand';
-      networkState.drawingMode = false;
-      networkState.drawingStartHex = null;
+    if (networkState.role === 'client') {
+      const allowedTools = ['hand', 'select', 'move'];
+      if (!allowedTools.includes(networkState.activeTool)) {
+        networkState.activeTool = 'hand';
+        networkState.drawingMode = false;
+        networkState.drawingStartHex = null;
+      }
     }
   });
 
@@ -182,10 +185,10 @@
     </div>
   {/if}
 
-  <!-- GM Floating Toolbar -->
-  {#if networkState.role === 'host'}
+  <!-- Floating Toolbar -->
+  {#if networkState.role === 'host' || networkState.role === 'client'}
     <div class="gm-toolbar">
-      <div class="toolbar-title">GM TOOLS</div>
+      <div class="toolbar-title">{networkState.role === 'host' ? 'GM TOOLS' : 'PLAYER TOOLS'}</div>
       
       <button 
         class="tool-btn {networkState.activeTool === 'hand' ? 'active' : ''}" 
@@ -229,10 +232,11 @@
         <span class="tool-label">Select</span>
       </button>
 
-      <button 
-        class="tool-btn {networkState.activeTool === 'particles' ? 'active' : ''}" 
-        onclick={() => { 
-          networkState.activeTool = 'particles'; 
+      {#if networkState.role === 'host'}
+        <button 
+          class="tool-btn {networkState.activeTool === 'particles' ? 'active' : ''}" 
+          onclick={() => { 
+            networkState.activeTool = 'particles'; 
           networkState.drawingMode = false; 
           networkState.drawingStartHex = null;
           networkState.addLog('Particles Tool active: Click grid cells to trigger a spiritual wave!');
@@ -325,6 +329,7 @@
           <span class="tool-icon">🗑️</span>
           <span class="tool-label">Delete</span>
         </button>
+        {/if}
       {/if}
     </div>
   {/if}
