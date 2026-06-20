@@ -495,6 +495,22 @@ export const networkState = $state({
       const piece = networkState.gameState.pieces[pieceId];
       if (!piece || piece.class !== 'personagem') return;
       const dist = getHexDistance(piece.x, piece.z, x, z);
+
+      if (dist <= 1) {
+        // Treat as normal move (free/no EP cost)
+        if (networkState.isCellBlocked(x, z, piece)) {
+          networkState.addLog(`BLOCKED: Move destination is blocked by a wall.`);
+          conn.send({ type: 'STATE_UPDATE', gameState: safeSnapshot(networkState.gameState, true) });
+          return;
+        }
+        networkState.saveUndoState();
+        piece.x = x;
+        piece.z = z;
+        networkState.addLog(`Client ${conn.peer} moved character ${piece.name} normally to (${x}, ${z})`);
+        networkState.broadcastGameState();
+        return;
+      }
+
       const dashRange = piece.dashRange ?? 3;
       const dashEpCost = piece.dashEpCost ?? 20;
       const currentEp = piece.ep ?? 0;
@@ -798,6 +814,7 @@ export const networkState = $state({
     const piece = networkState.getPiece(pieceId);
     if (!piece) return;
 
+    networkState.dashMode = false;
     const buildMode = networkState.gameState.buildMode;
 
     if (networkState.role === 'host') {
@@ -1673,23 +1690,33 @@ export const networkState = $state({
   requestDash(pieceId, targetX, targetZ) {
     const piece = networkState.gameState.pieces[pieceId];
     if (!piece || piece.class !== 'personagem') return;
+    const dist = getHexDistance(piece.x, piece.z, targetX, targetZ);
+
+    if (dist <= 1) {
+      networkState.requestMove(pieceId, targetX, piece.y || 0, targetZ);
+      networkState.dashMode = false;
+      return;
+    }
+
     const dashRange = piece.dashRange ?? 3;
     const dashEpCost = piece.dashEpCost ?? 20;
     const currentEp = piece.ep ?? 0;
-    const dist = getHexDistance(piece.x, piece.z, targetX, targetZ);
 
     if (dist > dashRange) {
       networkState.addLog(`BLOCKED: Dash range exceeded (${dist}/${dashRange} hexes).`);
+      networkState.dashMode = false;
       return;
     }
     if (currentEp < dashEpCost) {
       networkState.addLog(`BLOCKED: EP insuficiente para Dash (${currentEp}/${dashEpCost}).`);
+      networkState.dashMode = false;
       return;
     }
 
     if (networkState.role === 'host') {
       if (networkState.isCellBlocked(targetX, targetZ, piece)) {
         networkState.addLog(`BLOCKED: Destino do Dash bloqueado por parede.`);
+        networkState.dashMode = false;
         return;
       }
       piece.ep = Math.max(0, currentEp - dashEpCost);
@@ -1697,11 +1724,13 @@ export const networkState = $state({
       piece.z = targetZ;
       piece.animationEffect = { type: 'dash', timestamp: Date.now() };
       networkState.addLog(`${piece.name} usou Dash para (${targetX}, ${targetZ})! EP restante: ${piece.ep}`);
+      networkState.dashMode = false;
       networkState.broadcastGameState(true);
     } else if (networkState.role === 'client') {
       // Optimistic local EP deduction
       piece.ep = Math.max(0, currentEp - dashEpCost);
       piece.animationEffect = { type: 'dash', timestamp: Date.now() };
+      networkState.dashMode = false;
       if (networkState.hostConnection && networkState.hostConnection.open) {
         networkState.hostConnection.send({ type: 'INTENT_DASH', pieceId, x: targetX, z: targetZ });
       }

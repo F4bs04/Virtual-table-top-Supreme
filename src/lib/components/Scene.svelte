@@ -186,7 +186,7 @@
     const dashRange = selectedPiece.dashRange ?? 3;
     const dashEpCost = selectedPiece.dashEpCost ?? 20;
     const canDash = (selectedPiece.ep ?? 0) >= dashEpCost;
-    const maxDist = networkState.dashMode ? dashRange : Math.max(1, canDash ? dashRange : 1);
+    const maxDist = networkState.dashMode ? dashRange : 1;
     const cs = selectedPiece.x;
     const rs = selectedPiece.z;
     const hexes = [];
@@ -198,7 +198,7 @@
         if (tc >= 0 && tc < gridSize && tr >= 0 && tr < gridSize) {
           const d = getHexDistance(cs, rs, tc, tr);
           if (d >= 1 && d <= maxDist && !networkState.isCellBlocked(tc, tr, selectedPiece)) {
-            const isDash = networkState.dashMode || d > 1;
+            const isDash = d > 1;
             if (!isDash || canDash) {
               hexes.push({ c: tc, r: tr, isDash });
             }
@@ -657,8 +657,7 @@
     if (!selectedPieceObj) return false;
 
     const isDashHex = movementHexes.some(hex => hex.c === targetX && hex.r === targetZ && hex.isDash);
-    if (networkState.dashMode || isDashHex) {
-      if (!isDashHex) return false;
+    if (isDashHex) {
       networkState.requestDash(pieceId, targetX, targetZ);
       networkState.dashMode = false;
       return true;
@@ -668,6 +667,7 @@
     if (!isMoveHex && !(networkState.role === 'host' && networkState.activeTool === 'move')) return false;
 
     networkState.requestMove(pieceId, targetX, selectedPieceObj.y || 0, targetZ);
+    networkState.dashMode = false;
     return true;
   }
 
