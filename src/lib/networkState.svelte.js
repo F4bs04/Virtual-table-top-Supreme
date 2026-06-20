@@ -569,7 +569,6 @@ export const networkState = $state({
       }
       
       // In-place selective merge to prevent full Svelte component tear-down & WebGL lag
-      // (This updates properties on the existing reactive state object)
       if (networkState.gameState.buildMode !== newState.buildMode) {
         networkState.gameState.buildMode = newState.buildMode;
       }
@@ -588,8 +587,26 @@ export const networkState = $state({
       if (networkState.gameState.backgroundImageOpacity !== newState.backgroundImageOpacity) {
         networkState.gameState.backgroundImageOpacity = newState.backgroundImageOpacity;
       }
+      if (networkState.gameState.basicPlaneSize !== newState.basicPlaneSize) {
+        networkState.gameState.basicPlaneSize = newState.basicPlaneSize;
+      }
+      if (networkState.gameState.activePopupImage !== newState.activePopupImage) {
+        networkState.gameState.activePopupImage = newState.activePopupImage;
+      }
+      if (networkState.gameState.currentTurnIndex !== newState.currentTurnIndex) {
+        networkState.gameState.currentTurnIndex = newState.currentTurnIndex;
+      }
+      if (networkState.gameState.turnPhase !== newState.turnPhase) {
+        networkState.gameState.turnPhase = newState.turnPhase;
+      }
       if (newState.recentRolls) {
         networkState.gameState.recentRolls = newState.recentRolls;
+      }
+      if (newState.turnOrder && !safeEquals(networkState.gameState.turnOrder, newState.turnOrder)) {
+        networkState.gameState.turnOrder = newState.turnOrder;
+      }
+      if (newState.activeParticles && !safeEquals(networkState.gameState.activeParticles, newState.activeParticles)) {
+        networkState.gameState.activeParticles = newState.activeParticles;
       }
 
       // Merge environments map
@@ -672,7 +689,6 @@ export const networkState = $state({
     }
   },
 
-  // Undo GM action
   undo() {
     if (networkState.role !== 'host') return;
     if (networkState.undoStack.length === 0) {
@@ -686,7 +702,7 @@ export const networkState = $state({
     networkState.addLog('Ação desfeita (Ctrl+Z).');
   },
 
-  // Broadcast game state to all clients
+    // Broadcast game state to all clients
   broadcastGameState(isFull = false) {
     if (networkState.role !== 'host') return;
     
