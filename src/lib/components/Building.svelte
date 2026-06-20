@@ -33,6 +33,9 @@
   // Use custom height if provided, otherwise default to floors calculation
   const buildingHeight = $derived(typeof height === 'number' ? height : Math.max(0.65, floors * 0.65));
 
+  // wall opacity based on selection and obstructions
+  const baseWallOpacity = $derived(isHovered ? 0.95 : ((isCharacterInside || isObstructing) ? 0.25 : 0.82));
+
   // Load custom wall texture reactively
   $effect(() => {
     if (textureUrl) {
@@ -101,12 +104,18 @@
 
   // Backface culling when character is inside or it is obstructing, otherwise DoubleSide
   const wallMaterialSide = $derived((isCharacterInside || isObstructing) ? THREE.BackSide : THREE.DoubleSide);
-  const wallOpacity = $derived(isHovered ? 0.95 : ((isCharacterInside || isObstructing) ? 0.25 : 0.82));
 
   // Show only if on the current view level
   // Floor N occupies Y range: (N-1)*floorHeight to N*floorHeight - epsilon
   const objectFloor = $derived(Math.round(y / floorHeight) + 1);
-  const isVisible = $derived(objectFloor <= networkState.currentViewLevel);
+  const opacityMultiplier = $derived.by(() => {
+    const diff = networkState.currentViewLevel - objectFloor;
+    if (diff === 0) return 1.0;
+    if (diff > 0) return 0.35;
+    return 0.0;
+  });
+  const isVisible = $derived(opacityMultiplier > 0.05);
+  const wallOpacity = $derived(baseWallOpacity * opacityMultiplier);
 
   function handlePointerDown(e) {
     e.stopPropagation();
@@ -129,7 +138,7 @@
   {#if isSelected}
     <T.Mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.025, 0]}>
       <T.RingGeometry args={[Math.max(width, depth) * 0.58, Math.max(width, depth) * 0.64, 48]} />
-      <T.MeshBasicMaterial color="#22d3ee" side={THREE.DoubleSide} transparent opacity={0.75} />
+      <T.MeshBasicMaterial color="#22d3ee" side={THREE.DoubleSide} transparent opacity={0.75 * opacityMultiplier} />
     </T.Mesh>
   {/if}
 

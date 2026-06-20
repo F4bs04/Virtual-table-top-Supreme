@@ -32,33 +32,39 @@
   const centerZ = $derived((p1.z + p2.z) / 2);
 
   const objectFloor = $derived(Math.round(y / floorHeight) + 1);
-  const isVisible = $derived(objectFloor <= networkState.currentViewLevel);
+  const opacityMultiplier = $derived.by(() => {
+    const diff = networkState.currentViewLevel - objectFloor;
+    if (diff === 0) return 1.0;
+    if (diff > 0) return 0.35;
+    return 0.0;
+  });
+  const isVisible = $derived(opacityMultiplier > 0.05);
 </script>
 
 <T.Group position={[centerX, y, centerZ]} rotation={[0, angle, 0]} visible={isVisible}>
   {#if isSelected}
     <T.Mesh position={[0, height / 2, 0]}>
       <T.BoxGeometry args={[thickness + 0.1, height + 0.1, length + 0.1]} />
-      <T.MeshBasicMaterial color="#06b6d4" wireframe side={THREE.DoubleSide} />
+      <T.MeshBasicMaterial color="#06b6d4" wireframe side={THREE.DoubleSide} transparent opacity={opacityMultiplier} />
     </T.Mesh>
   {/if}
 
   <!-- Left Frame Pole -->
   <T.Mesh position={[0, height / 2, -length / 2 + 0.05]}>
     <T.BoxGeometry args={[thickness * 1.2, height, 0.1]} />
-    <T.MeshBasicMaterial color="#451a03" />
+    <T.MeshBasicMaterial color="#451a03" transparent={opacityMultiplier < 0.95} opacity={opacityMultiplier} />
   </T.Mesh>
 
   <!-- Right Frame Pole -->
   <T.Mesh position={[0, height / 2, length / 2 - 0.05]}>
     <T.BoxGeometry args={[thickness * 1.2, height, 0.1]} />
-    <T.MeshBasicMaterial color="#451a03" />
+    <T.MeshBasicMaterial color="#451a03" transparent={opacityMultiplier < 0.95} opacity={opacityMultiplier} />
   </T.Mesh>
 
   <!-- Top Frame Beam -->
   <T.Mesh position={[0, height - 0.05, 0]}>
     <T.BoxGeometry args={[thickness * 1.2, 0.1, length]} />
-    <T.MeshBasicMaterial color="#451a03" />
+    <T.MeshBasicMaterial color="#451a03" transparent={opacityMultiplier < 0.95} opacity={opacityMultiplier} />
   </T.Mesh>
 
   <!-- Door Slab Panel -->
@@ -78,6 +84,6 @@
     }}
   >
     <T.BoxGeometry args={[thickness * 0.6, height - 0.1, length - 0.2]} />
-    <T.MeshBasicMaterial color={color} transparent opacity={0.8} />
+    <T.MeshBasicMaterial color={color} transparent opacity={0.8 * opacityMultiplier} />
   </T.Mesh>
 </T.Group>

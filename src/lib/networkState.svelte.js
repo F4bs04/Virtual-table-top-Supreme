@@ -504,7 +504,7 @@ export const networkState = $state({
         conn.send({ type: 'STATE_UPDATE', gameState: $state.snapshot(networkState.gameState) });
         return;
       }
-      if (networkState.isCellBlocked(x, z)) {
+      if (networkState.isCellBlocked(x, z, piece)) {
         networkState.addLog(`BLOCKED: Dash destination is blocked by a wall.`);
         conn.send({ type: 'STATE_UPDATE', gameState: $state.snapshot(networkState.gameState) });
         return;
@@ -541,7 +541,7 @@ export const networkState = $state({
         }
         
         // Wall Collision Block check
-        if (networkState.isCellBlocked(x, z)) {
+        if (networkState.isCellBlocked(x, z, piece)) {
           networkState.addLog(`BLOCKED: Client ${conn.peer} tried to move ${piece.name} into a wall at (${x}, ${z}).`);
           conn.send({
             type: 'STATE_UPDATE',
@@ -841,7 +841,7 @@ export const networkState = $state({
       }
 
       // Wall Collision Block check
-      if (networkState.isCellBlocked(x, z)) {
+      if (networkState.isCellBlocked(x, z, piece)) {
         networkState.addLog(`BLOCKED: Cannot move into walls!`);
         return;
       }
@@ -1685,7 +1685,7 @@ export const networkState = $state({
     }
 
     if (networkState.role === 'host') {
-      if (networkState.isCellBlocked(targetX, targetZ)) {
+      if (networkState.isCellBlocked(targetX, targetZ, piece)) {
         networkState.addLog(`BLOCKED: Destino do Dash bloqueado por parede.`);
         return;
       }
@@ -1915,8 +1915,21 @@ export const networkState = $state({
     }
   },
 
-  isCellBlocked(c, r) {
+  isCellBlocked(c, r, pieceOrFloor = null) {
+    let targetFloor = networkState.currentViewLevel;
+    if (typeof pieceOrFloor === 'number') {
+      targetFloor = pieceOrFloor;
+    } else if (pieceOrFloor && typeof pieceOrFloor === 'object') {
+      targetFloor = Math.round((pieceOrFloor.y || 0) / 2.0) + 1;
+    }
+
     return networkState.getAllCurrentPieces().some(p => {
+      // Only block if the obstacle is on the same floor level as targetFloor!
+      const obstacleFloor = Math.round((p.y || 0) / 2.0) + 1;
+      if (obstacleFloor !== targetFloor) {
+        return false;
+      }
+
       if (p.structureType === 'house') {
         const minC = p.x - (p.width - 1) / 2;
         const maxC = p.x + (p.width - 1) / 2;

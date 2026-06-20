@@ -33,14 +33,20 @@
 
   // Since window starts elevated (y = baseHeight + 0.5), we derive floor level from y - 0.5
   const objectFloor = $derived(Math.round((y - 0.5) / floorHeight) + 1);
-  const isVisible = $derived(objectFloor <= networkState.currentViewLevel);
+  const opacityMultiplier = $derived.by(() => {
+    const diff = networkState.currentViewLevel - objectFloor;
+    if (diff === 0) return 1.0;
+    if (diff > 0) return 0.35;
+    return 0.0;
+  });
+  const isVisible = $derived(opacityMultiplier > 0.05);
 </script>
 
 <T.Group position={[centerX, y, centerZ]} rotation={[0, angle, 0]} visible={isVisible}>
   {#if isSelected}
     <T.Mesh position={[0, height / 2, 0]}>
       <T.BoxGeometry args={[thickness + 0.1, height + 0.1, length + 0.1]} />
-      <T.MeshBasicMaterial color="#06b6d4" wireframe side={THREE.DoubleSide} />
+      <T.MeshBasicMaterial color="#06b6d4" wireframe side={THREE.DoubleSide} transparent opacity={opacityMultiplier} />
     </T.Mesh>
   {/if}
 
@@ -48,22 +54,22 @@
   <!-- Bottom Beam -->
   <T.Mesh position={[0, 0.05, 0]}>
     <T.BoxGeometry args={[thickness * 1.1, 0.1, length]} />
-    <T.MeshBasicMaterial color="#1e293b" />
+    <T.MeshBasicMaterial color="#1e293b" transparent={opacityMultiplier < 0.95} opacity={opacityMultiplier} />
   </T.Mesh>
   <!-- Top Beam -->
   <T.Mesh position={[0, height - 0.05, 0]}>
     <T.BoxGeometry args={[thickness * 1.1, 0.1, length]} />
-    <T.MeshBasicMaterial color="#1e293b" />
+    <T.MeshBasicMaterial color="#1e293b" transparent={opacityMultiplier < 0.95} opacity={opacityMultiplier} />
   </T.Mesh>
   <!-- Left Side -->
   <T.Mesh position={[0, height / 2, -length / 2 + 0.05]}>
     <T.BoxGeometry args={[thickness * 1.1, height, 0.1]} />
-    <T.MeshBasicMaterial color="#1e293b" />
+    <T.MeshBasicMaterial color="#1e293b" transparent={opacityMultiplier < 0.95} opacity={opacityMultiplier} />
   </T.Mesh>
   <!-- Right Side -->
   <T.Mesh position={[0, height / 2, length / 2 - 0.05]}>
     <T.BoxGeometry args={[thickness * 1.1, height, 0.1]} />
-    <T.MeshBasicMaterial color="#1e293b" />
+    <T.MeshBasicMaterial color="#1e293b" transparent={opacityMultiplier < 0.95} opacity={opacityMultiplier} />
   </T.Mesh>
 
   <!-- Glass Pane -->
@@ -83,6 +89,6 @@
     }}
   >
     <T.BoxGeometry args={[thickness * 0.3, height - 0.2, length - 0.2]} />
-    <T.MeshBasicMaterial color={color} transparent opacity={0.4} side={THREE.DoubleSide} />
+    <T.MeshBasicMaterial color={color} transparent opacity={0.4 * opacityMultiplier} side={THREE.DoubleSide} />
   </T.Mesh>
 </T.Group>

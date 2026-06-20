@@ -197,7 +197,7 @@
         const tr = rs + dr;
         if (tc >= 0 && tc < gridSize && tr >= 0 && tr < gridSize) {
           const d = getHexDistance(cs, rs, tc, tr);
-          if (d >= 1 && d <= maxDist && !networkState.isCellBlocked(tc, tr)) {
+          if (d >= 1 && d <= maxDist && !networkState.isCellBlocked(tc, tr, selectedPiece)) {
             const isDash = networkState.dashMode || d > 1;
             if (!isDash || canDash) {
               hexes.push({ c: tc, r: tr, isDash });

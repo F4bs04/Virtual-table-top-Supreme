@@ -48,7 +48,13 @@
   const width = 1.2; // Width of the sloped stairs plane
 
   const objectFloor = $derived(Math.round(y / floorHeight) + 1);
-  const isVisible = $derived(objectFloor <= networkState.currentViewLevel);
+  const opacityMultiplier = $derived.by(() => {
+    const diff = networkState.currentViewLevel - objectFloor;
+    if (diff === 0) return 1.0;
+    if (diff > 0) return 0.35;
+    return 0.0;
+  });
+  const isVisible = $derived(opacityMultiplier > 0.05);
 
   // Generate procedural stair steps canvas texture
   let activeTexture = $state(null);
@@ -97,7 +103,7 @@
     <!-- Selection highlight outline box -->
     <T.Mesh rotation={[-Math.PI / 2 + angleX, 0, 0]}>
       <T.PlaneGeometry args={[width + 0.1, length + 0.1]} />
-      <T.MeshBasicMaterial color="#06b6d4" wireframe side={THREE.DoubleSide} />
+      <T.MeshBasicMaterial color="#06b6d4" wireframe side={THREE.DoubleSide} transparent opacity={opacityMultiplier} />
     </T.Mesh>
   {/if}
 
@@ -119,9 +125,9 @@
   >
     <T.PlaneGeometry args={[width, length]} />
     {#if activeTexture}
-      <T.MeshBasicMaterial map={activeTexture} side={THREE.DoubleSide} transparent opacity={0.95} />
+      <T.MeshBasicMaterial map={activeTexture} side={THREE.DoubleSide} transparent opacity={0.95 * opacityMultiplier} />
     {:else}
-      <T.MeshBasicMaterial bind:ref={matRef} color={color} side={THREE.DoubleSide} transparent opacity={0.8} />
+      <T.MeshBasicMaterial bind:ref={matRef} color={color} side={THREE.DoubleSide} transparent opacity={0.8 * opacityMultiplier} />
     {/if}
   </T.Mesh>
 </T.Group>
