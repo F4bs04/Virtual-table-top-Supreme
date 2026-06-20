@@ -569,37 +569,37 @@ export const networkState = $state({
       }
       
       // In-place selective merge to prevent full Svelte component tear-down & WebGL lag
-      if (networkState.gameState.buildMode !== newState.buildMode) {
+      if (newState.buildMode !== undefined && networkState.gameState.buildMode !== newState.buildMode) {
         networkState.gameState.buildMode = newState.buildMode;
       }
-      if (networkState.gameState.theme !== newState.theme) {
+      if (newState.theme !== undefined && networkState.gameState.theme !== newState.theme) {
         networkState.gameState.theme = newState.theme;
       }
-      if (networkState.gameState.gridSize !== newState.gridSize) {
+      if (newState.gridSize !== undefined && networkState.gameState.gridSize !== newState.gridSize) {
         networkState.gameState.gridSize = newState.gridSize;
       }
-      if (networkState.gameState.currentEnvironmentId !== newState.currentEnvironmentId) {
+      if (newState.currentEnvironmentId !== undefined && networkState.gameState.currentEnvironmentId !== newState.currentEnvironmentId) {
         networkState.gameState.currentEnvironmentId = newState.currentEnvironmentId;
       }
-      if (networkState.gameState.backgroundImage !== newState.backgroundImage) {
+      if (newState.backgroundImage !== undefined && networkState.gameState.backgroundImage !== newState.backgroundImage) {
         networkState.gameState.backgroundImage = newState.backgroundImage;
       }
-      if (networkState.gameState.backgroundImageOpacity !== newState.backgroundImageOpacity) {
+      if (newState.backgroundImageOpacity !== undefined && networkState.gameState.backgroundImageOpacity !== newState.backgroundImageOpacity) {
         networkState.gameState.backgroundImageOpacity = newState.backgroundImageOpacity;
       }
-      if (networkState.gameState.basicPlaneSize !== newState.basicPlaneSize) {
+      if (newState.basicPlaneSize !== undefined && networkState.gameState.basicPlaneSize !== newState.basicPlaneSize) {
         networkState.gameState.basicPlaneSize = newState.basicPlaneSize;
       }
-      if (networkState.gameState.activePopupImage !== newState.activePopupImage) {
+      if (newState.activePopupImage !== undefined && networkState.gameState.activePopupImage !== newState.activePopupImage) {
         networkState.gameState.activePopupImage = newState.activePopupImage;
       }
-      if (networkState.gameState.currentTurnIndex !== newState.currentTurnIndex) {
+      if (newState.currentTurnIndex !== undefined && networkState.gameState.currentTurnIndex !== newState.currentTurnIndex) {
         networkState.gameState.currentTurnIndex = newState.currentTurnIndex;
       }
-      if (networkState.gameState.turnPhase !== newState.turnPhase) {
+      if (newState.turnPhase !== undefined && networkState.gameState.turnPhase !== newState.turnPhase) {
         networkState.gameState.turnPhase = newState.turnPhase;
       }
-      if (newState.recentRolls) {
+      if (newState.recentRolls !== undefined) {
         networkState.gameState.recentRolls = newState.recentRolls;
       }
       if (newState.turnOrder && !safeEquals(networkState.gameState.turnOrder, newState.turnOrder)) {
@@ -617,10 +617,10 @@ export const networkState = $state({
             networkState.gameState.environments[envId] = env;
           } else {
             const targetEnv = networkState.gameState.environments[envId];
-            if (targetEnv.name !== env.name) targetEnv.name = env.name;
-            if (targetEnv.theme !== env.theme) targetEnv.theme = env.theme;
-            if (targetEnv.backgroundImage !== env.backgroundImage) targetEnv.backgroundImage = env.backgroundImage;
-            if (targetEnv.backgroundImageOpacity !== env.backgroundImageOpacity) targetEnv.backgroundImageOpacity = env.backgroundImageOpacity;
+            if (env.name !== undefined && targetEnv.name !== env.name) targetEnv.name = env.name;
+            if (env.theme !== undefined && targetEnv.theme !== env.theme) targetEnv.theme = env.theme;
+            if (env.backgroundImage !== undefined && targetEnv.backgroundImage !== env.backgroundImage) targetEnv.backgroundImage = env.backgroundImage;
+            if (env.backgroundImageOpacity !== undefined && targetEnv.backgroundImageOpacity !== env.backgroundImageOpacity) targetEnv.backgroundImageOpacity = env.backgroundImageOpacity;
             
             // Merge pieces inside environments
             if (env.pieces) {
@@ -715,6 +715,9 @@ export const networkState = $state({
           }
         }
       };
+      if (snap.backgroundImage && snap.backgroundImage.startsWith('data:')) {
+        delete snap.backgroundImage;
+      }
       if (snap.pieces) {
         for (const piece of Object.values(snap.pieces)) {
           stripPiece(piece);
@@ -722,6 +725,9 @@ export const networkState = $state({
       }
       if (snap.environments) {
         for (const env of Object.values(snap.environments)) {
+          if (env.backgroundImage && env.backgroundImage.startsWith('data:')) {
+            delete env.backgroundImage;
+          }
           if (env.pieces) {
             for (const piece of Object.values(env.pieces)) {
               stripPiece(piece);
