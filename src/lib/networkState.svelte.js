@@ -57,6 +57,37 @@ export const networkState = $state({
   saveUndoState() {
     if (networkState.role !== 'host') return;
     const snap = $state.snapshot(networkState.gameState);
+    
+    // Strip large base64 assets from undo snapshots to save RAM and CPU
+    const stripPiece = (piece) => {
+      if (piece) {
+        delete piece.photos;
+        if (piece.textureUrl && piece.textureUrl.startsWith('data:')) {
+          delete piece.textureUrl;
+        }
+      }
+    };
+    if (snap.backgroundImage && snap.backgroundImage.startsWith('data:')) {
+      delete snap.backgroundImage;
+    }
+    if (snap.pieces) {
+      for (const piece of Object.values(snap.pieces)) {
+        stripPiece(piece);
+      }
+    }
+    if (snap.environments) {
+      for (const env of Object.values(snap.environments)) {
+        if (env.backgroundImage && env.backgroundImage.startsWith('data:')) {
+          delete env.backgroundImage;
+        }
+        if (env.pieces) {
+          for (const piece of Object.values(env.pieces)) {
+            stripPiece(piece);
+          }
+        }
+      }
+    }
+
     networkState.undoStack.push(snap);
     if (networkState.undoStack.length > 50) {
       networkState.undoStack.shift();
@@ -66,7 +97,7 @@ export const networkState = $state({
   recentTextures: [],
   mcpConnected: 'disconnected', // 'disconnected' | 'connected' | 'connecting'
   mcpSocket: null,
-  showSplat: (typeof window !== 'undefined' && localStorage.getItem('vtt_show_splat') !== 'false'),
+  showSplat: (typeof window !== 'undefined' && localStorage.getItem('vtt_show_splat') === 'true'),
 
   toggleSplat() {
     networkState.showSplat = !networkState.showSplat;
