@@ -450,7 +450,8 @@ export const networkState = $state({
       if (typeof scale === 'number') piece.scale = scale;
       if (typeof textureUrl === 'string') piece.textureUrl = textureUrl;
       networkState.addLog(`Client ${conn.peer} updated sheet/states for ${piece.name}`);
-      networkState.broadcastGameState(true);
+      const isLargeUpload = typeof textureUrl === 'string' && textureUrl.startsWith('data:');
+      networkState.broadcastGameState(true, isLargeUpload);
       return;
     }
     if (data.type === 'INTENT_DASH') {
@@ -703,7 +704,7 @@ export const networkState = $state({
   },
 
     // Broadcast game state to all clients
-  broadcastGameState(isFull = false) {
+  broadcastGameState(isFull = false, includeLargeAssets = false) {
     if (networkState.role !== 'host') return;
     
     const stripLargeAssets = (snap) => {
@@ -741,7 +742,7 @@ export const networkState = $state({
     clearTimeout(broadcastTimeout);
     broadcastTimeout = setTimeout(() => {
       const snap = $state.snapshot(networkState.gameState);
-      const payloadState = isFull ? snap : stripLargeAssets(snap);
+      const payloadState = (isFull && includeLargeAssets) ? snap : stripLargeAssets(snap);
       
       networkState.connections.forEach(conn => {
         if (conn.open) {
@@ -860,7 +861,7 @@ export const networkState = $state({
     if (piece) {
       piece.textureUrl = url;
       networkState.addLog(`Updated texture for piece: ${piece.name}`);
-      networkState.broadcastGameState(true);
+      networkState.broadcastGameState(true, true);
     }
   },
 
@@ -1291,7 +1292,7 @@ export const networkState = $state({
       networkState.gameState.environments[envId].backgroundImage = url;
     }
     networkState.addLog('Background map image updated.');
-    networkState.broadcastGameState(true);
+    networkState.broadcastGameState(true, true);
   },
 
   updateBackgroundImageOpacity(opacity) {
@@ -1848,7 +1849,7 @@ export const networkState = $state({
       if (parsed && typeof parsed === 'object' && parsed.pieces) {
         networkState.gameState = parsed;
         networkState.addLog('Session loaded successfully!');
-        networkState.broadcastGameState(true);
+        networkState.broadcastGameState(true, true);
       } else {
         networkState.addLog('FAILED: Invalid session file structure.');
       }
