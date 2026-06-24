@@ -101,14 +101,7 @@ export const networkState = $state({
   recentTextures: [],
   mcpConnected: 'disconnected', // 'disconnected' | 'connected' | 'connecting'
   mcpSocket: null,
-  showSplat: (typeof window !== 'undefined' && localStorage.getItem('vtt_show_splat') === 'true'),
 
-  toggleSplat() {
-    networkState.showSplat = !networkState.showSplat;
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('vtt_show_splat', String(networkState.showSplat));
-    }
-  },
 
   getDefaultRecentTextures() {
     return [
@@ -903,15 +896,7 @@ export const networkState = $state({
     
     networkState.gameState.gameModeActive = !networkState.gameState.gameModeActive;
     networkState.addLog(`Modo Jogo (Otimizado) alterado para: ${networkState.gameState.gameModeActive ? 'ATIVADO (Performance Otimizada)' : 'DESATIVADO'}`);
-    
-    // Auto disable Gaussian splatting if Game Mode is active
-    if (networkState.gameState.gameModeActive && networkState.showSplat) {
-      networkState.showSplat = false;
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('vtt_show_splat', 'false');
-      }
-      networkState.addLog('Gaussian Splatting desativado automaticamente para otimização.');
-    }
+
 
     networkState.broadcastGameState(true);
   },  // Update piece texture

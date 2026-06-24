@@ -744,22 +744,6 @@
             </div>
           {/if}
 
-          <!-- Visual / Performance Preferences (Visible to both Host and Client) -->
-          <div class="glass-card performance-info fade-in" style="padding: 1rem; margin-top: 0.75rem;">
-            <h3 class="subsection-title" style="margin-top: 0; padding-bottom: 0.25rem;">Performance</h3>
-            <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.9rem;">
-              <span>Fundo 3D (Gaussian Splat):</span>
-              <input 
-                type="checkbox" 
-                checked={networkState.showSplat} 
-                onchange={() => networkState.toggleSplat()} 
-                style="width: 1.2rem; height: 1.2rem; cursor: pointer; accent-color: #a855f7;"
-              />
-            </div>
-            <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.35rem;">
-              Desative o fundo 3D se o tabuleiro estiver travando ou lento.
-            </div>
-          </div>
 
         {:else if activeTab === 'tokens'}
           <!-- TOKENS TAB -->

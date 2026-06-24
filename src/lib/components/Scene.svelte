@@ -12,7 +12,6 @@
   import Door from './Door.svelte';
   import Window from './Window.svelte';
   import Stair from './Stair.svelte';
-  import SplatBackground from './SplatBackground.svelte';
   import Shape3D from './Shape3D.svelte';
   import * as THREE from 'three';
 
@@ -34,7 +33,16 @@
     const chars = Object.values(networkState.gameState.pieces || {}).filter(
       p => p.class === 'personagem' && (p.environmentId || 'env-1') === currentRenderEnvId
     );
-    const objs = Object.values(envConfig.pieces || {});
+    const currentViewY = (networkState.currentViewLevel - 1) * 2.0;
+    const objs = Object.values(envConfig.pieces || {}).filter(
+      p => {
+        if (p.class === 'objeto') {
+          const py = p.y ?? 0;
+          return Math.abs(py - currentViewY) < 0.1;
+        }
+        return true;
+      }
+    );
     return [...chars, ...objs];
   });
 
@@ -990,15 +998,8 @@
   position={[gridSize / 2, 16, gridSize / 2]} 
   intensity={2.0} 
   color={directionalColor} 
-  castShadow={!networkState.gameState.gameModeActive}
+  castShadow={false}
 />
-<!-- Gaussian Splat Immersive Background -->
-{#if networkState.showSplat}
-  <SplatBackground 
-    position={[gridSize / 2, -0.5, gridSize / 2]} 
-    scale={[5, 5, 5]} 
-  />
-{/if}
 
 <!-- Hex Grid Line segments -->
 {#key hexGridPoints.length + '-' + networkState.currentViewLevel}
