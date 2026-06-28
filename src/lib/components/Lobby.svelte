@@ -370,19 +370,23 @@
             <div class="glass-card master-controls fade-in" style="padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem;">
               <h3 class="subsection-title" style="margin: 0; padding-bottom: 0.25rem;">Master Settings</h3>
               
-              <div class="control-row">
-                <span class="control-label" style="display: flex; align-items: center; gap: 0.35rem;">🎮 Modo Jogo (Otimizado):</span>
-                <label class="toggle-container">
-                  <input 
-                    type="checkbox" 
-                    checked={networkState.gameState.gameModeActive} 
-                    onchange={() => networkState.toggleGameMode()} 
-                  />
-                  <span class="toggle-slider"></span>
-                  <span class="toggle-label">
-                    <strong>{networkState.gameState.gameModeActive ? 'ATIVADO' : 'DESATIVADO'}</strong>
+              <div class="game-mode-btn-wrapper">
+                <button
+                  onclick={() => networkState.toggleGameMode()}
+                  class="game-mode-toggle-btn {networkState.gameState.gameModeActive ? 'game-mode-on' : 'game-mode-off'}"
+                >
+                  <span class="gm-btn-icon">{networkState.gameState.gameModeActive ? '▶' : '⏸'}</span>
+                  <span class="gm-btn-label">
+                    {#if networkState.gameState.gameModeActive}
+                      <strong>MODO JOGO</strong>
+                      <small>Performance Otimizada</small>
+                    {:else}
+                      <strong>MODO CONSTRUÇÃO</strong>
+                      <small>Clique para iniciar o jogo</small>
+                    {/if}
                   </span>
-                </label>
+                  <span class="gm-btn-status">{networkState.gameState.gameModeActive ? 'ON' : 'OFF'}</span>
+                </button>
               </div>
               <p class="help-text" style="font-size: 0.65rem; color: #94a3b8; margin: -0.4rem 0 0.4rem 0; line-height: 1.2;">
                 Otimiza a performance desativando sombras, animações de tokens e efeitos de partículas complexos.
@@ -1669,7 +1673,113 @@
     color: #a855f7;
   }
 
+  /* ── Game Mode prominent button ─────────────────────────────── */
+  .game-mode-btn-wrapper {
+    width: 100%;
+  }
+
+  .game-mode-toggle-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.85rem 1rem;
+    border-radius: 12px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.85rem;
+    text-align: left;
+    transition: all 0.25s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* OFF state — Construction mode */
+  .game-mode-toggle-btn.game-mode-off {
+    background: rgba(30, 41, 59, 0.7);
+    border-color: rgba(100, 116, 139, 0.4);
+    color: #94a3b8;
+  }
+  .game-mode-toggle-btn.game-mode-off:hover {
+    border-color: rgba(34, 197, 94, 0.5);
+    background: rgba(34, 197, 94, 0.08);
+    color: #e2e8f0;
+  }
+  .game-mode-toggle-btn.game-mode-off .gm-btn-icon { font-size: 1.5rem; color: #475569; }
+  .game-mode-toggle-btn.game-mode-off .gm-btn-status {
+    background: rgba(100, 116, 139, 0.25);
+    color: #64748b;
+    border: 1px solid rgba(100, 116, 139, 0.3);
+  }
+
+  /* ON state — Game mode active */
+  .game-mode-toggle-btn.game-mode-on {
+    background: linear-gradient(135deg, rgba(21, 128, 61, 0.35), rgba(5, 150, 105, 0.25));
+    border-color: rgba(34, 197, 94, 0.7);
+    color: #d1fae5;
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.25), inset 0 0 20px rgba(34, 197, 94, 0.05);
+    animation: game-mode-pulse 2.5s ease-in-out infinite;
+  }
+  .game-mode-toggle-btn.game-mode-on:hover {
+    box-shadow: 0 0 32px rgba(34, 197, 94, 0.45), inset 0 0 20px rgba(34, 197, 94, 0.1);
+  }
+  .game-mode-toggle-btn.game-mode-on .gm-btn-icon { font-size: 1.5rem; color: #4ade80; }
+  .game-mode-toggle-btn.game-mode-on .gm-btn-status {
+    background: rgba(34, 197, 94, 0.2);
+    color: #4ade80;
+    border: 1px solid rgba(34, 197, 94, 0.5);
+    animation: status-blink 1.8s ease-in-out infinite;
+  }
+
+  .gm-btn-icon {
+    flex-shrink: 0;
+    line-height: 1;
+  }
+
+  .gm-btn-label {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+  }
+  .gm-btn-label strong {
+    font-size: 0.9rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    display: block;
+  }
+  .gm-btn-label small {
+    font-size: 0.65rem;
+    opacity: 0.75;
+    letter-spacing: 0.02em;
+    display: block;
+  }
+
+  .gm-btn-status {
+    flex-shrink: 0;
+    font-size: 0.65rem;
+    font-weight: 900;
+    letter-spacing: 0.1em;
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+    font-family: monospace;
+  }
+
+  @keyframes game-mode-pulse {
+    0%, 100% { box-shadow: 0 0 20px rgba(34, 197, 94, 0.25), inset 0 0 20px rgba(34, 197, 94, 0.05); }
+    50% { box-shadow: 0 0 35px rgba(34, 197, 94, 0.45), inset 0 0 30px rgba(34, 197, 94, 0.1); }
+  }
+  @keyframes status-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+  }
+  /* ──────────────────────────────────────────────────────────── */
+
   .build-mode-console {
+
     padding: 1rem;
     border-radius: 10px;
     margin-bottom: 1.25rem;
