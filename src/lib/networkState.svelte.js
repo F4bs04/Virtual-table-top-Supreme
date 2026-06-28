@@ -1,6 +1,9 @@
 import { Peer } from 'peerjs';
 import { getHexDistance } from './hexGeometry.js';
 
+// Only emit debug logs in development builds
+const DEV = import.meta.env.DEV;
+
 function safeEquals(a, b) {
   if (a === b) return true;
   if (a === null || b === null || a === undefined || b === undefined) return a === b;
@@ -459,14 +462,16 @@ export const networkState = $state({
       if (!piece || piece.class !== 'personagem') return;
       networkState.saveUndoState();
       // Detect HP delta to auto-trigger visual effect
+      let animationEffect = null;
       if (typeof hp === 'number') {
         const prevHp = piece.hp ?? 0;
         const newHp = Math.max(0, Math.min(piece.maxHp ?? hp, hp));
         if (newHp !== prevHp) {
-          piece.animationEffect = {
+          animationEffect = {
             type: newHp < prevHp ? 'damage' : 'heal',
             timestamp: Date.now()
           };
+          piece.animationEffect = animationEffect;
         }
         piece.hp = newHp;
       }
@@ -480,7 +485,24 @@ export const networkState = $state({
       if (typeof textureUrl === 'string') piece.textureUrl = textureUrl;
       networkState.addLog(`Client ${conn.peer} updated sheet/states for ${piece.name}`);
       const isLargeUpload = typeof textureUrl === 'string' && textureUrl.startsWith('data:');
-      networkState.broadcastGameState(true, isLargeUpload);
+      if (isLargeUpload) {
+        // Large texture upload: still needs full broadcast so others get the new texture
+        networkState.broadcastGameState(true, true);
+      } else {
+        // Small sheet update: send a targeted delta
+        networkState.broadcastDelta('PIECE_SHEET', {
+          pieceId,
+          hp: piece.hp,
+          ep: piece.ep,
+          notes: piece.notes,
+          dead: piece.dead,
+          stunned: piece.stunned,
+          name: piece.name,
+          color: piece.color,
+          scale: piece.scale,
+          animationEffect
+        });
+      }
       return;
     }
     if (data.type === 'INTENT_DASH') {
@@ -500,7 +522,8 @@ export const networkState = $state({
         piece.x = x;
         piece.z = z;
         networkState.addLog(`Client ${conn.peer} moved character ${piece.name} normally to (${x}, ${z})`);
-        networkState.broadcastGameState();
+        // Delta: only the position changed
+        networkState.broadcastDelta('PIECE_MOVED', { pieceId, x, y: piece.y ?? 0, z });
         return;
       }
 
@@ -526,9 +549,11 @@ export const networkState = $state({
       piece.ep = Math.max(0, currentEp - dashEpCost);
       piece.x = x;
       piece.z = z;
-      piece.animationEffect = { type: 'dash', timestamp: Date.now() };
+      const dashEffect = { type: 'dash', timestamp: Date.now() };
+      piece.animationEffect = dashEffect;
       networkState.addLog(`${piece.name} usou Dash para (${x}, ${z})! EP restante: ${piece.ep}`);
-      networkState.broadcastGameState();
+      // Delta: position + EP + animation effect
+      networkState.broadcastDelta('PIECE_DASH', { pieceId, x, y: piece.y ?? 0, z, ep: piece.ep, animationEffect: dashEffect });
       return;
     }
 
@@ -568,7 +593,8 @@ export const networkState = $state({
         piece.y = y;
         piece.z = z;
         networkState.addLog(`Client ${conn.peer} moved character ${piece.name} to (${x}, ${y}, ${z})`);
-        networkState.broadcastGameState();
+        // Delta: only broadcast the changed position
+        networkState.broadcastDelta('PIECE_MOVED', { pieceId, x, y, z });
       } else if (piece.class === 'objeto') {
         networkState.addLog(`BLOCKED: Client ${conn.peer} tried to move object ${piece.name} without authority!`);
         conn.send({
@@ -591,22 +617,83 @@ export const networkState = $state({
       const { roll } = data;
       networkState.gameState.recentRolls = [roll, ...networkState.gameState.recentRolls.slice(0, 9)];
       networkState.addLog(`${roll.name} rolled ${roll.die}: [ ${roll.result} ]`);
-      networkState.broadcastGameState(true);
+      // Delta: only the new roll entry
+      networkState.broadcastDelta('ROLL_ADDED', { roll });
     } else if (data.type === 'INTENT_PIECE_EFFECT') {
       const { pieceId, effectType } = data;
       const piece = networkState.gameState.pieces[pieceId];
       if (piece) {
-        piece.animationEffect = {
-          type: effectType,
-          timestamp: Date.now()
-        };
+        const effect = { type: effectType, timestamp: Date.now() };
+        piece.animationEffect = effect;
         networkState.addLog(`Client ${conn.peer} triggered visual effect '${effectType}' on ${piece.name}`);
-        networkState.broadcastGameState(true);
+        // Delta: only the effect payload
+        networkState.broadcastDelta('PIECE_EFFECT', { pieceId, animationEffect: effect });
       }
     }
   },
 
   _handleDataFromHost(data) {
+    // ── Delta message handlers (fast path — no full state merge needed) ──
+    if (data.type === 'PIECE_MOVED') {
+      const piece = networkState.gameState.pieces[data.pieceId];
+      if (piece) {
+        piece.x = data.x;
+        piece.y = data.y;
+        piece.z = data.z;
+      }
+      return;
+    }
+    if (data.type === 'PIECE_DASH') {
+      const piece = networkState.gameState.pieces[data.pieceId];
+      if (piece) {
+        piece.x = data.x;
+        piece.y = data.y;
+        piece.z = data.z;
+        piece.ep = data.ep;
+        if (data.animationEffect) piece.animationEffect = data.animationEffect;
+      }
+      return;
+    }
+    if (data.type === 'PIECE_SHEET') {
+      const piece = networkState.gameState.pieces[data.pieceId];
+      if (piece) {
+        if (data.hp !== undefined) piece.hp = data.hp;
+        if (data.ep !== undefined) piece.ep = data.ep;
+        if (data.notes !== undefined) piece.notes = data.notes;
+        if (data.dead !== undefined) piece.dead = data.dead;
+        if (data.stunned !== undefined) piece.stunned = data.stunned;
+        if (data.name !== undefined) piece.name = data.name;
+        if (data.color !== undefined) piece.color = data.color;
+        if (data.scale !== undefined) piece.scale = data.scale;
+        if (data.animationEffect) piece.animationEffect = data.animationEffect;
+      }
+      return;
+    }
+    if (data.type === 'PIECE_EFFECT') {
+      const piece = networkState.gameState.pieces[data.pieceId];
+      if (piece && data.animationEffect) {
+        piece.animationEffect = data.animationEffect;
+      }
+      return;
+    }
+    if (data.type === 'ROLL_ADDED') {
+      if (data.roll) {
+        networkState.gameState.recentRolls = [data.roll, ...(networkState.gameState.recentRolls || []).slice(0, 9)];
+      }
+      return;
+    }
+    if (data.type === 'TURN_DELTA') {
+      if (data.currentTurnIndex !== undefined) networkState.gameState.currentTurnIndex = data.currentTurnIndex;
+      if (data.turnPhase !== undefined) networkState.gameState.turnPhase = data.turnPhase;
+      if (data.turnOrder !== undefined) networkState.gameState.turnOrder = data.turnOrder;
+      return;
+    }
+    if (data.type === 'PARTICLES_DELTA') {
+      if (data.activeParticles) networkState.gameState.activeParticles = data.activeParticles;
+      return;
+    }
+
+    // ── Full state sync (STATE_INIT on join, STATE_UPDATE for build changes) ──
     if (data.type === 'STATE_INIT' || data.type === 'STATE_UPDATE') {
       const newState = data.gameState;
       if (!networkState.gameState) {
@@ -751,7 +838,7 @@ export const networkState = $state({
     networkState.addLog('Ação desfeita (Ctrl+Z).');
   },
 
-    // Broadcast game state to all clients
+    // Broadcast game state to all clients (full resync)
   broadcastGameState(isFull = false, includeLargeAssets = false) {
     if (networkState.role !== 'host') return;
     
@@ -802,6 +889,16 @@ export const networkState = $state({
     }, 50);
   },
 
+  // ── Delta broadcast: send a small targeted update instead of full state ──
+  // Use for high-frequency events: piece moves, HP/EP changes, rolls, effects.
+  broadcastDelta(type, payload) {
+    if (networkState.role !== 'host') return;
+    const msg = { type, ...payload };
+    networkState.connections.forEach(conn => {
+      if (conn.open) conn.send(msg);
+    });
+  },
+
   // Move request execution
   requestMove(pieceId, x, y, z) {
     const piece = networkState.getPiece(pieceId);
@@ -838,16 +935,17 @@ export const networkState = $state({
         piece.z = z;
       }
       networkState.addLog(`Host moved ${piece.name} to (${x}, ${y}, ${z})`);
-      networkState.broadcastGameState();
+      // Delta update: only send the changed fields for this piece
+      networkState.broadcastDelta('PIECE_MOVED', { pieceId, x, y, z });
     } else if (networkState.role === 'client') {
-      console.log('[DEBUG] requestMove client path', 'pieceId:', pieceId, 'target:', x, y, z, 'hostConnection:', !!networkState.hostConnection, 'open:', networkState.hostConnection?.open);
+      if (DEV) console.log('[DEBUG] requestMove client path', 'pieceId:', pieceId, 'target:', x, y, z, 'hostConnection:', !!networkState.hostConnection, 'open:', networkState.hostConnection?.open);
       if (piece.class === 'objeto') {
         networkState.addLog(`BLOCKED: Clients cannot move object pieces.`);
         return;
       }
       
       const dist = getHexDistance(piece.x, piece.z, x, z);
-      console.log('[DEBUG] requestMove dist:', dist);
+      if (DEV) console.log('[DEBUG] requestMove dist:', dist);
       if (dist > 1) {
         networkState.addLog(`BLOCKED: Players can only move 1 space at a time! (Tried: ${dist} spaces)`);
         return;
@@ -861,7 +959,7 @@ export const networkState = $state({
       
       networkState.addLog(`Sending movement intent for ${piece.name} to (${x}, ${y}, ${z})...`);
       if (networkState.hostConnection && networkState.hostConnection.open) {
-        console.log('[DEBUG] requestMove sending INTENT_MOVE...');
+        if (DEV) console.log('[DEBUG] requestMove sending INTENT_MOVE...');
         networkState.hostConnection.send({
           type: 'INTENT_MOVE',
           pieceId,
@@ -870,7 +968,7 @@ export const networkState = $state({
           z
         });
       } else {
-        console.log('[DEBUG] requestMove FAILED: no hostConnection or not open');
+        if (DEV) console.log('[DEBUG] requestMove FAILED: no hostConnection or not open');
       }
     }
   },
@@ -2012,7 +2110,7 @@ export const networkState = $state({
     if (networkState.role === 'host') {
       networkState.gameState.recentRolls = [roll, ...networkState.gameState.recentRolls.slice(0, 9)];
       networkState.addLog(`${rollerName} rolled ${dieType}: [ ${result} ]`);
-      networkState.broadcastGameState();
+      networkState.broadcastDelta('ROLL_ADDED', { roll });
     } else {
       // Send intent to host to broadcast the roll
       if (networkState.hostConnection && networkState.hostConnection.open) {
@@ -2088,7 +2186,7 @@ export const networkState = $state({
     const next = (networkState.gameState.currentTurnIndex + 1) % order.length;
     networkState.gameState.currentTurnIndex = next;
     networkState.addLog(`>> Turn ${next + 1}: ${order[next]?.name || '?'}`);
-    networkState.broadcastGameState();
+    networkState.broadcastDelta('TURN_DELTA', { currentTurnIndex: next, turnPhase: networkState.gameState.turnPhase });
   },
 
   prevTurn() {
@@ -2102,7 +2200,7 @@ export const networkState = $state({
     const prev = (networkState.gameState.currentTurnIndex - 1 + order.length) % order.length;
     networkState.gameState.currentTurnIndex = prev;
     networkState.addLog(`<< Turn ${prev + 1}: ${order[prev]?.name || '?'}`);
-    networkState.broadcastGameState();
+    networkState.broadcastDelta('TURN_DELTA', { currentTurnIndex: prev, turnPhase: networkState.gameState.turnPhase });
   },
 
   setTurnOrder(newOrder) {
@@ -2150,7 +2248,7 @@ export const networkState = $state({
     networkState.gameState.currentTurnIndex = 0;
     networkState.gameState.turnPhase = 'idle';
     networkState.addLog('Turn order cleared.');
-    networkState.broadcastGameState();
+    networkState.broadcastDelta('TURN_DELTA', { turnOrder: [], currentTurnIndex: 0, turnPhase: 'idle' });
   },
 
   // Trigger a GM spiritual burst/particles
@@ -2168,7 +2266,7 @@ export const networkState = $state({
     };
     networkState.gameState.activeParticles = [burst, ...networkState.gameState.activeParticles.slice(0, 4)];
     networkState.addLog(`GM triggered a ${effectType} particle effect at (${x}, ${z})!`);
-    networkState.broadcastGameState();
+    networkState.broadcastDelta('PARTICLES_DELTA', { activeParticles: networkState.gameState.activeParticles });
   },
 
   // Trigger a damage or heal overlay + bounce effect on a piece
@@ -2176,12 +2274,10 @@ export const networkState = $state({
     if (networkState.role === 'host') {
       const piece = networkState.gameState.pieces[pieceId];
       if (piece) {
-        piece.animationEffect = {
-          type: effectType,
-          timestamp: Date.now()
-        };
+        const effect = { type: effectType, timestamp: Date.now() };
+        piece.animationEffect = effect;
         networkState.addLog(`GM triggered visual effect '${effectType}' on ${piece.name}!`);
-        networkState.broadcastGameState();
+        networkState.broadcastDelta('PIECE_EFFECT', { pieceId, animationEffect: effect });
       }
     } else if (networkState.role === 'client') {
       networkState.addLog(`Requesting visual effect '${effectType}' on piece...`);

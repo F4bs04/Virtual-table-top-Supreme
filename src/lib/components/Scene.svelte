@@ -15,6 +15,9 @@
   import Shape3D from './Shape3D.svelte';
   import * as THREE from 'three';
 
+  // Only emit debug logs in development builds
+  const DEV = import.meta.env.DEV;
+
   const currentRenderEnvId = $derived.by(() => {
     const selectedPiece = networkState.getPiece(networkState.selectedPieceId);
     if (selectedPiece && selectedPiece.class === 'personagem' && selectedPiece.environmentId) {
@@ -176,7 +179,7 @@
   const selectedPiece = $derived(networkState.selectedPieceId ? networkState.getPiece(networkState.selectedPieceId) : null);
 
   $effect(() => {
-    if (typeof window !== 'undefined') {
+    if (DEV && typeof window !== 'undefined') {
       console.log('[DEBUG] role:', networkState.role, 'selectedPieceId:', networkState.selectedPieceId, 'selectedPiece:', selectedPiece?.name, 'pieces count:', Object.keys(networkState.gameState.pieces).length);
     }
   });
@@ -185,7 +188,7 @@
   const movementHexes = $derived.by(() => {
     if (networkState.drawingMode || networkState.activeTool === 'particles') return [];
     if (!selectedPiece || selectedPiece.class !== 'personagem') {
-      if (typeof window !== 'undefined') {
+      if (DEV && typeof window !== 'undefined') {
         console.log('[DEBUG] movementHexes blocked: selectedPiece=', !!selectedPiece, 'class=', selectedPiece?.class);
       }
       return [];
@@ -214,7 +217,7 @@
         }
       }
     }
-    if (typeof window !== 'undefined') {
+    if (DEV && typeof window !== 'undefined') {
       console.log('[DEBUG] movementHexes count:', hexes.length, 'dashMode:', networkState.dashMode, 'canDash:', (selectedPiece?.ep ?? 0) >= (selectedPiece?.dashEpCost ?? 20));
     }
     return hexes;
@@ -336,19 +339,41 @@
 
 
   // Sims-style cut-away transparency effect
+  // Wall mesh cache: rebuilt only when structures change (not every frame)
+  let cachedWalls = [];
+  let wallsCacheDirty = true;
+  let lastObstructionCheckTime = 0;
+  const OBSTRUCTION_CHECK_INTERVAL = 100; // ms — runs at ~10fps instead of 60fps
+
+  // Mark the wall cache dirty whenever the current env pieces change
+  $effect(() => {
+    // Reading these derived values subscribes to their changes
+    const _envPieces = networkState.gameState.environments?.[networkState.gameState.currentEnvironmentId || 'env-1']?.pieces;
+    const _pieces = networkState.gameState.pieces;
+    wallsCacheDirty = true;
+  });
+
   useTask(() => {
     const activeCamera = camera.current;
     if (!activeCamera) return;
 
-    // Collect all wall meshes in the scene
-    const walls = [];
-    scene.traverse((obj) => {
-      if (obj.isMesh && obj.userData && obj.userData.structureId) {
-        walls.push(obj);
-      }
-    });
+    // Throttle: only check obstructions every 100ms
+    const now = Date.now();
+    if (now - lastObstructionCheckTime < OBSTRUCTION_CHECK_INTERVAL) return;
+    lastObstructionCheckTime = now;
 
-    if (walls.length === 0 || charactersWorldPositions.length === 0) {
+    // Rebuild the wall cache only when the scene structure has changed
+    if (wallsCacheDirty) {
+      cachedWalls = [];
+      scene.traverse((obj) => {
+        if (obj.isMesh && obj.userData && obj.userData.structureId) {
+          cachedWalls.push(obj);
+        }
+      });
+      wallsCacheDirty = false;
+    }
+
+    if (cachedWalls.length === 0 || charactersWorldPositions.length === 0) {
       if (networkState.obstructedStructureIds.size > 0) {
         networkState.obstructedStructureIds.clear();
       }
@@ -365,7 +390,7 @@
 
       raycaster.set(camPos, dir);
       
-      const intersects = raycaster.intersectObjects(walls);
+      const intersects = raycaster.intersectObjects(cachedWalls);
       intersects.forEach((hit) => {
         // Obstructing if the wall is closer than the token
         if (hit.distance < dist) {
