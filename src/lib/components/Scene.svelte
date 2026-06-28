@@ -37,9 +37,14 @@
       p => p.class === 'personagem' && (p.environmentId || 'env-1') === currentRenderEnvId
     );
     const currentViewY = (networkState.currentViewLevel - 1) * 2.0;
+    const isBuildMode = networkState.gameState.buildMode;
     const objs = Object.values(envConfig.pieces || {}).filter(
       p => {
         if (p.class === 'objeto') {
+          // Build Mode: show ALL structures across all floors so the builder
+          // can see walls on upper floors while editing.
+          if (isBuildMode) return true;
+          // Game Mode: strict floor filter — only show objects on the current floor.
           const py = p.y ?? 0;
           return Math.abs(py - currentViewY) < 0.1;
         }

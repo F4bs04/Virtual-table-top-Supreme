@@ -186,11 +186,12 @@
   const objectFloor = $derived(Math.round(y / floorHeight) + 1);
   const opacityMultiplier = $derived.by(() => {
     const diff = networkState.currentViewLevel - objectFloor;
-    if (diff === 0) return 1.0;
-    if (diff > 0) return 0.35;
-    return 0.0;
+    if (diff === 0) return 1.0;                             // current floor: fully visible
+    if (diff > 0) return 0.35;                              // floor below: ghost (always)
+    // floor above: only visible in Build Mode as a structural reference ghost
+    return networkState.gameState.buildMode ? 0.15 : 0.0;
   });
-  const isVisible = $derived(opacityMultiplier > 0.05);
+  const isVisible = $derived(opacityMultiplier > 0.01);
   const wallOpacity = $derived((isHovered ? 0.95 : (isObstructing ? 0.08 : 0.88)) * opacityMultiplier);
   const wallMaterialSide = THREE.DoubleSide;
 

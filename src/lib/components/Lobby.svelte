@@ -346,7 +346,44 @@
         </div>
       </div>
 
+      <!-- ── Mode Switch: BUILD ↔ GAME (Host only, always visible) ── -->
+      {#if networkState.role === 'host'}
+        <div class="mode-switch-wrapper" style="flex-shrink: 0;">
+          <div class="mode-switch-pill">
+            <!-- BUILD side -->
+            <button
+              class="mode-pill-btn {networkState.gameState.buildMode ? 'pill-active-build' : 'pill-inactive'}"
+              onclick={() => {
+                if (!networkState.gameState.buildMode) networkState.toggleBuildMode();
+                if (networkState.gameState.gameModeActive) networkState.toggleGameMode();
+              }}
+            >
+              <span class="pill-icon">🔨</span>
+              <span class="pill-text">
+                <strong>CONSTRUÇÃO</strong>
+                <small>Editar mapa</small>
+              </span>
+            </button>
+            <!-- GAME side -->
+            <button
+              class="mode-pill-btn {!networkState.gameState.buildMode ? 'pill-active-game' : 'pill-inactive'}"
+              onclick={() => {
+                if (networkState.gameState.buildMode) networkState.toggleBuildMode();
+                if (!networkState.gameState.gameModeActive) networkState.toggleGameMode();
+              }}
+            >
+              <span class="pill-icon">▶</span>
+              <span class="pill-text">
+                <strong>JOGO</strong>
+                <small>Performance ativa</small>
+              </span>
+            </button>
+          </div>
+        </div>
+      {/if}
+
       <!-- Navigation Tabs -->
+
       <div class="lobby-tabs" style="display: flex; gap: 0.35rem; margin-bottom: 0.5rem; flex-shrink: 0; width: 100%;">
         <button class="vtt-btn tab-btn {activeTab === 'map' ? 'active' : ''}" onclick={() => activeTab = 'map'} style="flex: 1; padding: 0.45rem 0.25rem; font-size: 0.72rem; white-space: nowrap;">
           🏰 Mapa
@@ -1775,6 +1812,96 @@
   @keyframes status-blink {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.55; }
+  }
+  /* ──────────────────────────────────────────────────────────── */
+
+  /* ── Build ↔ Game Mode Pill Switch ──────────────────────────── */
+  .mode-switch-wrapper {
+    margin-bottom: 0.5rem;
+  }
+
+  .mode-switch-pill {
+    display: flex;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    overflow: hidden;
+    background: rgba(15, 23, 42, 0.8);
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.4);
+  }
+
+  .mode-pill-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem 0.5rem;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s ease;
+    position: relative;
+  }
+
+  .pill-icon {
+    font-size: 1.25rem;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+
+  .pill-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.05rem;
+    text-align: left;
+  }
+  .pill-text strong {
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    display: block;
+    line-height: 1;
+  }
+  .pill-text small {
+    font-size: 0.6rem;
+    opacity: 0.7;
+    display: block;
+    line-height: 1;
+  }
+
+  /* Inactive state */
+  .mode-pill-btn.pill-inactive {
+    color: #475569;
+  }
+  .mode-pill-btn.pill-inactive:hover {
+    background: rgba(255,255,255,0.04);
+    color: #94a3b8;
+  }
+
+  /* Build active */
+  .mode-pill-btn.pill-active-build {
+    background: linear-gradient(135deg, rgba(217, 119, 6, 0.35), rgba(180, 83, 9, 0.25));
+    color: #fbbf24;
+    box-shadow: inset 0 0 16px rgba(251, 191, 36, 0.1), 0 0 20px rgba(251, 191, 36, 0.15);
+  }
+  .mode-pill-btn.pill-active-build .pill-text strong { color: #fcd34d; }
+  .mode-pill-btn.pill-active-build .pill-text small { color: #f59e0b; opacity: 0.85; }
+
+  /* Game active */
+  .mode-pill-btn.pill-active-game {
+    background: linear-gradient(135deg, rgba(21, 128, 61, 0.4), rgba(5, 150, 105, 0.3));
+    color: #4ade80;
+    box-shadow: inset 0 0 16px rgba(74, 222, 128, 0.1), 0 0 20px rgba(74, 222, 128, 0.2);
+    animation: game-mode-pulse 2.5s ease-in-out infinite;
+  }
+  .mode-pill-btn.pill-active-game .pill-text strong { color: #86efac; }
+  .mode-pill-btn.pill-active-game .pill-text small { color: #4ade80; opacity: 0.85; }
+
+  /* Divider between the two halves */
+  .mode-pill-btn:first-child {
+    border-right: 1px solid rgba(255,255,255,0.08);
   }
   /* ──────────────────────────────────────────────────────────── */
 
