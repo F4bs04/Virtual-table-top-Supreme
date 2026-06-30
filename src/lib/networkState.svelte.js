@@ -78,6 +78,7 @@ export const networkState = $state({
   logs: [],
   selectedPieceId: null,
   selectedEnvironmentId: null,
+  pendingMoveHex: null,
   suppressNextGroundDeselect: false,
   currentViewLevel: 1, // 1 = Ground Floor, 2 = Second Floor, etc.
   drawingMode: false, // drawing active state for GM

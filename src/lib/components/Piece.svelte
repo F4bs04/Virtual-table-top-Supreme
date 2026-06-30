@@ -385,7 +385,7 @@
       // Left-click selects the token
       e.stopPropagation();
       if (networkState.role === 'client') {
-        networkState.activeTool = 'hand';
+        networkState.activeTool = 'move';
       }
       networkState.selectedPieceId = id;
       networkState.suppressNextGroundDeselect = true;

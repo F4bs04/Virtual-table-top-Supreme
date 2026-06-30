@@ -38,6 +38,7 @@
           networkState.moveLockPieceId = null;
           networkState.selectedPieceId = null;
           networkState.selectedEnvironmentId = null;
+          networkState.pendingMoveHex = null;
           networkState.activeTool = 'select';
           networkState.addLog('Selection cancelled (ESC). Select tool active.');
         }

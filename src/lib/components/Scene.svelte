@@ -637,7 +637,7 @@
     }
 
     if (networkState.selectedPieceId !== null) {
-      if (networkState.activeTool === 'move' || networkState.role === 'client') {
+      if (networkState.activeTool === 'move') {
         const moved = tryMoveSelectedToHex(targetX, targetZ);
         if (moved) return;
       }
@@ -661,22 +661,12 @@
 
   function handleRedHexClick(e, c, r) {
     e?.stopPropagation();
-    if (networkState.selectedPieceId !== null) {
-      const p = networkState.getPiece(networkState.selectedPieceId);
-      if (p) {
-        networkState.requestMove(networkState.selectedPieceId, c, p.y || 0, r);
-      }
-    }
+    tryMoveSelectedToHex(c, r);
   }
 
   function handleDashHexClick(e, c, r) {
     e?.stopPropagation();
-    if (networkState.selectedPieceId !== null && networkState.dashMode) {
-      networkState.requestDash(networkState.selectedPieceId, c, r);
-      networkState.dashMode = false;
-      networkState.selectedPieceId = null;
-      networkState.selectedEnvironmentId = null;
-    }
+    tryMoveSelectedToHex(c, r);
   }
 
   function handleHexClick(e, c, r, isDash) {
@@ -691,22 +681,38 @@
     const pieceId = networkState.selectedPieceId;
     if (pieceId === null) return false;
 
+    if (networkState.activeTool !== 'move') return false;
+
     const selectedPieceObj = networkState.getPiece(pieceId);
     if (!selectedPieceObj) return false;
 
     const isDashHex = movementHexes.some(hex => hex.c === targetX && hex.r === targetZ && hex.isDash);
-    if (isDashHex) {
-      networkState.requestDash(pieceId, targetX, targetZ);
-      networkState.dashMode = false;
-      return true;
+    const isMoveHex = movementHexes.some(hex => hex.c === targetX && hex.r === targetZ && !hex.isDash);
+
+    if (!isDashHex && !isMoveHex && !(networkState.role === 'host' && networkState.activeTool === 'move')) {
+      networkState.pendingMoveHex = null;
+      return false;
     }
 
-    const isMoveHex = movementHexes.some(hex => hex.c === targetX && hex.r === targetZ && !hex.isDash);
-    if (!isMoveHex && !(networkState.role === 'host' && networkState.activeTool === 'move')) return false;
-
-    networkState.requestMove(pieceId, targetX, selectedPieceObj.y || 0, targetZ);
-    networkState.dashMode = false;
-    return true;
+    const pending = networkState.pendingMoveHex;
+    if (pending && pending.c === targetX && pending.r === targetZ && pending.pieceId === pieceId) {
+      if (isDashHex) {
+        networkState.requestDash(pieceId, targetX, targetZ);
+        networkState.dashMode = false;
+        networkState.selectedPieceId = null;
+        networkState.selectedEnvironmentId = null;
+      } else {
+        networkState.requestMove(pieceId, targetX, selectedPieceObj.y || 0, targetZ);
+        networkState.dashMode = false;
+      }
+      networkState.pendingMoveHex = null;
+      return true;
+    } else {
+      networkState.pendingMoveHex = { c: targetX, r: targetZ, isDash: isDashHex, pieceId };
+      const actionName = isDashHex ? 'Dash' : 'Movimento';
+      networkState.addLog(`${actionName} para (${targetX}, ${targetZ}) selecionado. Clique novamente para confirmar.`);
+      return false;
+    }
   }
 
   function isUiPointerEvent(e) {
@@ -920,10 +926,11 @@
                   }
                   networkState.suppressNextGroundDeselect = false;
                   if (networkState.role === 'client') {
-                    networkState.activeTool = 'hand';
+                    networkState.activeTool = 'move';
                   }
                   networkState.dashMode = false;
                   networkState.selectedPieceId = foundPiece.pieceId;
+                  networkState.pendingMoveHex = null;
                   networkState.selectedEnvironmentId = piece.class === 'personagem' ? null : currentRenderEnvId;
                   if (piece.class === 'personagem') {
                     networkState.addLog(`Selecionado: ${piece.name}. Clique no hex vermelho para mover.`);
@@ -957,6 +964,7 @@
               networkState.selectedPieceId = null;
               networkState.selectedEnvironmentId = null;
               networkState.dashMode = false;
+              networkState.pendingMoveHex = null;
             }
           }
         }
@@ -965,6 +973,11 @@
 
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
+        if (networkState.pendingMoveHex) {
+          networkState.pendingMoveHex = null;
+          networkState.addLog('Confirmação de movimento cancelada.');
+          return;
+        }
         // Cancel dash mode
         if (networkState.dashMode) {
           networkState.dashMode = false;
@@ -1181,7 +1194,8 @@
   {@const pos = hexToWorld(hex.c, hex.r)}
   {@const pieceY = Math.max(selectedPiece ? (selectedPiece.y || 0) : 0, (networkState.currentViewLevel - 1) * 2.0)}
   {@const rangeY = pieceY + 0.01}
-  {@const hexColor = hex.isDash ? '#06b6d4' : '#ef4444'}
+  {@const isPending = networkState.pendingMoveHex && networkState.pendingMoveHex.c === hex.c && networkState.pendingMoveHex.r === hex.r && networkState.pendingMoveHex.pieceId === networkState.selectedPieceId}
+  {@const hexColor = isPending ? '#10b981' : (hex.isDash ? '#06b6d4' : '#ef4444')}
   <!-- Subtle inner fill -->
   <T.Mesh 
     position={[pos.x, rangeY, pos.z]} 
@@ -1197,7 +1211,7 @@
     }}
   >
     <T.RingGeometry args={[0, 1 / Math.sqrt(3) - 0.02, 6]} />
-    <T.MeshBasicMaterial color={hexColor} transparent opacity={hex.isDash ? 0.15 : 0.1} side={THREE.DoubleSide} depthWrite={false} />
+    <T.MeshBasicMaterial color={hexColor} transparent opacity={isPending ? 0.35 : (hex.isDash ? 0.15 : 0.1)} side={THREE.DoubleSide} depthWrite={false} />
   </T.Mesh>
   <!-- Thin glowing outer border -->
   <T.Mesh 
@@ -1214,7 +1228,7 @@
     }}
   >
     <T.RingGeometry args={[1 / Math.sqrt(3) - 0.02, 1 / Math.sqrt(3), 6]} />
-    <T.MeshBasicMaterial color={hexColor} transparent opacity={0.8} side={THREE.DoubleSide} depthWrite={false} />
+    <T.MeshBasicMaterial color={hexColor} transparent opacity={isPending ? 1.0 : 0.8} side={THREE.DoubleSide} depthWrite={false} />
   </T.Mesh>
 {/each}
 
