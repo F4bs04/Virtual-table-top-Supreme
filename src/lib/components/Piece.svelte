@@ -78,6 +78,10 @@
     return () => clearInterval(interval);
   });
 
+  let canvasEl = $state(null);
+  let imgEl = $state(null);
+  let canvasTextureRef = $state(null);
+
   const { camera } = useThrelte();
 
   // Visual effects and animation state
@@ -131,6 +135,17 @@
   let dragStartPos = null;
 
   useTask((delta) => {
+    if (isAnimated && imgEl && canvasEl) {
+      const ctx = canvasEl.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+        ctx.drawImage(imgEl, 0, 0, canvasEl.width, canvasEl.height);
+        if (canvasTextureRef) {
+          canvasTextureRef.needsUpdate = true;
+        }
+      }
+    }
+
     if (meshRef && camera.current) {
       meshRef.quaternion.copy(camera.current.quaternion);
     }
@@ -448,37 +463,50 @@
   {/if}
 
   {#if isAnimated}
-    <HTML 
-      sprite
-      position={[0, 0.6 * scale, 0]}
-      pointerEvents="auto"
-      center
-    >
-      {#key loopBuster}
-        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-        <img 
-          src={textureUrl} 
-          alt={name}
-          onpointerdown={handlePointerDown}
-          onpointerover={() => { isHovered = true; }}
-          onpointerout={() => { isHovered = false; }}
-          style="
-            width: 100px;
-            height: 100px;
-            object-fit: contain;
-            transform: scale(${(isHovered ? 1.4 : 1.2) * scale * (flipX ? -1 : 1)}, ${(isHovered ? 1.4 : 1.2) * scale}) translateY(${-visualY * 100}px);
-            opacity: ${opacityMultiplier * (dashBlink ? 0.25 : 1.0)};
-            filter: drop-shadow(0 0 8px ${color});
-            cursor: pointer;
-            pointer-events: auto;
-          "
-        />
-      {/key}
-    </HTML>
+    {#key loopBuster}
+      <img 
+        bind:this={imgEl}
+        src={textureUrl}
+        alt="hidden asset"
+        style="display: none;"
+      />
+    {/key}
+    <canvas 
+      bind:this={canvasEl}
+      width={256}
+      height={256}
+      style="display: none;"
+    ></canvas>
   {/if}
 
   <!-- Interactive Billboard Group -->
   <T.Group bind:ref={meshRef}>
+    {#if isAnimated && canvasEl}
+      <!-- Animated Mesh -->
+      <T.Mesh 
+        scale={[(isHovered ? 1.4 : 1.2) * scale * (flipX ? -1 : 1), (isHovered ? 1.4 : 1.2) * scale, 1]}
+        position={[0, (0.6 + visualY) * scale, 0]}
+        onpointerdown={handlePointerDown}
+        onpointerover={() => { isHovered = true; }}
+        onpointerout={() => { isHovered = false; }}
+        userData={{ pieceId: id, pieceClass }}
+      >
+        <T.PlaneGeometry args={[1, 1]} />
+        <T.MeshBasicMaterial 
+          color={overlayColor}
+          transparent={true}
+          alphaTest={currentAlphaTest}
+          opacity={opacityMultiplier * (dashBlink ? 0.25 : 1.0)}
+          side={THREE.DoubleSide}
+        >
+          <T.CanvasTexture 
+            bind:ref={canvasTextureRef}
+            args={[canvasEl]} 
+          />
+        </T.MeshBasicMaterial>
+      </T.Mesh>
+    {/if}
+
     {#if !isAnimated && activeTexture}
       <!-- Main Mesh -->
       <T.Mesh 
