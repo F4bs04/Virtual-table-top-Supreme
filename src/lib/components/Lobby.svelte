@@ -24,29 +24,36 @@
   let groupPages = $state({});
   let collapsedGroups = $state({}); // track collapsible group headers
   let newGroupName = $state('');
-  let customGroups = $state([]);
+  const currentEnvId = $derived(networkState.gameState.currentEnvironmentId || 'env-1');
+  const customGroups = $derived(
+    networkState.gameState.environments?.[currentEnvId]?.customGroups || []
+  );
   const pieceListPageSize = 20;
 
   function addGroup() {
     const name = newGroupName.trim();
     if (name) {
-      if (!customGroups.includes(name)) {
-        customGroups = [...customGroups, name];
+      const currentEnv = networkState.gameState.environments?.[currentEnvId];
+      if (currentEnv) {
+        if (!currentEnv.customGroups) {
+          currentEnv.customGroups = [];
+        }
+        if (!currentEnv.customGroups.includes(name)) {
+          currentEnv.customGroups = [...currentEnv.customGroups, name];
+        }
       }
       newGroupName = '';
-      networkState.addLog(`Grupo criado: ${name}`);
+      networkState.addLog(`Grupo criado no mapa: ${name}`);
+      networkState.broadcastGameState();
     }
   }
 
   const currentPieceList = $derived.by(() => {
     const currentEnvId = networkState.gameState.currentEnvironmentId || 'env-1';
-    const globalPieces = Object.values(networkState.gameState.pieces || {});
-    const environmentPieces = Object.values(networkState.gameState.environments || {}).flatMap(env => (
-      Object.values(env.pieces || {}).map(piece => ({ ...piece, environmentId: piece.environmentId || env.id }))
-    ));
-
     const allPieces = activePieceListTab === 'personagens'
-      ? [...environmentPieces, ...globalPieces].filter(p => p.class === 'personagem')
+      ? Object.values(networkState.gameState.pieces || {}).filter(
+          p => p.class === 'personagem' && (p.environmentId === currentEnvId || (!p.environmentId && currentEnvId === 'env-1'))
+        )
       : Object.values(networkState.gameState.environments?.[currentEnvId]?.pieces || {}).filter(p => p.class !== 'personagem');
     
     // Filter duplicates by piece id
@@ -105,13 +112,10 @@
   }
 
   const characterCount = $derived.by(() => {
-    const globalPieces = Object.values(networkState.gameState.pieces || {});
-    const environmentPieces = Object.values(networkState.gameState.environments || {}).flatMap(env => Object.values(env.pieces || {}));
-    const uniqueCharacters = {};
-    [...environmentPieces, ...globalPieces].forEach(piece => {
-      if (piece.class === 'personagem') uniqueCharacters[piece.id] = piece;
-    });
-    return Object.keys(uniqueCharacters).length;
+    const currentEnvId = networkState.gameState.currentEnvironmentId || 'env-1';
+    return Object.values(networkState.gameState.pieces || {}).filter(
+      p => p.class === 'personagem' && (p.environmentId === currentEnvId || (!p.environmentId && currentEnvId === 'env-1'))
+    ).length;
   });
 
   const objectCount = $derived.by(() => {

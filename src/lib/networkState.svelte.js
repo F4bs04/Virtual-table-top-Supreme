@@ -95,6 +95,7 @@ export const networkState = $state({
   lastAuthoritativeState: null,
   saveUndoState() {
     if (networkState.role !== 'host') return;
+    if (!networkState.gameState || !networkState.gameState.buildMode) return;
     const snap = safeSnapshot(networkState.gameState, true);
     networkState.undoStack.push(snap);
     if (networkState.undoStack.length > 50) {
@@ -863,6 +864,10 @@ export const networkState = $state({
 
   undo() {
     if (networkState.role !== 'host') return;
+    if (!networkState.gameState || !networkState.gameState.buildMode) {
+      networkState.addLog('Ctrl+Z desativado: O Modo de Construção não está ativo.');
+      return;
+    }
     if (networkState.undoStack.length === 0) {
       networkState.addLog('Nada para desfazer (Ctrl+Z).');
       return;
@@ -1017,6 +1022,9 @@ export const networkState = $state({
     }
     
     networkState.gameState.buildMode = !networkState.gameState.buildMode;
+    if (!networkState.gameState.buildMode) {
+      networkState.undoStack = [];
+    }
     networkState.addLog(`Build Mode toggled to: ${networkState.gameState.buildMode ? 'ON (Master can move objects)' : 'OFF'}`);
     networkState.broadcastGameState(true);
   },
