@@ -319,7 +319,7 @@
     if (!piece || piece.visibleOnMap === false) return false;
 
     const pieceFloor = Math.round((piece.y || 0) / 2.0) + 1;
-    return pieceFloor <= networkState.currentViewLevel;
+    return pieceFloor === networkState.currentViewLevel;
   }
 
   function collectPieceRaycastCandidates() {
@@ -773,12 +773,39 @@
             ];
             const intersects = raycaster.intersectObjects(targetMeshes, false);
             if (intersects.length > 0) {
-              const hitMesh = intersects[0].object;
-              if (gizmoMeshes.includes(hitMesh)) {
+              const hitGizmo = intersects.find(hit => gizmoMeshes.includes(hit.object));
+              if (hitGizmo) {
                 console.log('[DEBUG] handleGlobalPointerDown: Intersected gizmo first, ignoring drag initiation.');
                 return;
               }
-              const found = candidates.find(c => c.mesh === hitMesh);
+
+              // Prioritize characters, then token objects, then fallback to structural elements
+              let found = null;
+              
+              const characterHit = intersects.find(hit => {
+                const cand = candidates.find(c => c.mesh === hit.object);
+                return cand && cand.pieceClass === 'personagem';
+              });
+
+              const tokenObjectHit = intersects.find(hit => {
+                const cand = candidates.find(c => c.mesh === hit.object);
+                if (cand && cand.pieceClass === 'objeto') {
+                  const piece = networkState.getPiece(cand.pieceId);
+                  return piece && !piece.structureType;
+                }
+                return false;
+              });
+
+              const structureHit = intersects.find(hit => candidates.some(c => c.mesh === hit.object));
+
+              if (characterHit) {
+                found = candidates.find(c => c.mesh === characterHit.object);
+              } else if (tokenObjectHit) {
+                found = candidates.find(c => c.mesh === tokenObjectHit.object);
+              } else if (structureHit) {
+                found = candidates.find(c => c.mesh === structureHit.object);
+              }
+
               if (found) {
                 const piece = networkState.getPiece(found.pieceId);
                 if (piece) {
@@ -914,16 +941,40 @@
 
             const intersects = raycaster.intersectObjects(targetMeshes, false);
             if (intersects.length > 0) {
-              const hitMesh = intersects[0].object;
-
               // 1. Gizmo clicked -> ignore
-              if (gizmoMeshes.includes(hitMesh)) {
+              const hitGizmo = intersects.find(hit => gizmoMeshes.includes(hit.object));
+              if (hitGizmo) {
                 console.log('[DEBUG] handleGlobalPointerUp: Intersected gizmo first, ignoring click.');
                 return;
               }
 
-              // 2. Piece clicked -> select
-              const foundPiece = candidates.find(c => c.mesh === hitMesh);
+              // 2. Piece clicked -> select (Prioritize characters, then token objects, then structures)
+              let foundPiece = null;
+              
+              const characterHit = intersects.find(hit => {
+                const cand = candidates.find(c => c.mesh === hit.object);
+                return cand && cand.pieceClass === 'personagem';
+              });
+
+              const tokenObjectHit = intersects.find(hit => {
+                const cand = candidates.find(c => c.mesh === hit.object);
+                if (cand && cand.pieceClass === 'objeto') {
+                  const piece = networkState.getPiece(cand.pieceId);
+                  return piece && !piece.structureType;
+                }
+                return false;
+              });
+
+              const structureHit = intersects.find(hit => candidates.some(c => c.mesh === hit.object));
+
+              if (characterHit) {
+                foundPiece = candidates.find(c => c.mesh === characterHit.object);
+              } else if (tokenObjectHit) {
+                foundPiece = candidates.find(c => c.mesh === tokenObjectHit.object);
+              } else if (structureHit) {
+                foundPiece = candidates.find(c => c.mesh === structureHit.object);
+              }
+
               if (foundPiece) {
                 const piece = networkState.getPiece(foundPiece.pieceId);
                 if (piece) {

@@ -28,7 +28,7 @@
   const customGroups = $derived(
     networkState.gameState.environments?.[currentEnvId]?.customGroups || []
   );
-  const pieceListPageSize = 20;
+  const pieceListPageSize = 9999;
 
   function addGroup() {
     const name = newGroupName.trim();
@@ -50,11 +50,17 @@
 
   const currentPieceList = $derived.by(() => {
     const currentEnvId = networkState.gameState.currentEnvironmentId || 'env-1';
+    const currentFloor = networkState.currentViewLevel;
     const allPieces = activePieceListTab === 'personagens'
       ? Object.values(networkState.gameState.pieces || {}).filter(
-          p => p.class === 'personagem' && (p.environmentId === currentEnvId || (!p.environmentId && currentEnvId === 'env-1'))
+          p => p.class === 'personagem' && 
+               (p.environmentId === currentEnvId || (!p.environmentId && currentEnvId === 'env-1')) &&
+               (Math.round((p.y || 0) / 2.0) + 1 === currentFloor)
         )
-      : Object.values(networkState.gameState.environments?.[currentEnvId]?.pieces || {}).filter(p => p.class !== 'personagem');
+      : Object.values(networkState.gameState.environments?.[currentEnvId]?.pieces || {}).filter(
+          p => p.class !== 'personagem' &&
+               (Math.round((p.y || 0) / 2.0) + 1 === currentFloor)
+        );
     
     // Filter duplicates by piece id
     const uniquePiecesMap = {};
@@ -113,14 +119,21 @@
 
   const characterCount = $derived.by(() => {
     const currentEnvId = networkState.gameState.currentEnvironmentId || 'env-1';
+    const currentFloor = networkState.currentViewLevel;
     return Object.values(networkState.gameState.pieces || {}).filter(
-      p => p.class === 'personagem' && (p.environmentId === currentEnvId || (!p.environmentId && currentEnvId === 'env-1'))
+      p => p.class === 'personagem' && 
+           (p.environmentId === currentEnvId || (!p.environmentId && currentEnvId === 'env-1')) &&
+           (Math.round((p.y || 0) / 2.0) + 1 === currentFloor)
     ).length;
   });
 
   const objectCount = $derived.by(() => {
     const currentEnvId = networkState.gameState.currentEnvironmentId || 'env-1';
-    return Object.values(networkState.gameState.environments?.[currentEnvId]?.pieces || {}).filter(p => p.class !== 'personagem').length;
+    const currentFloor = networkState.currentViewLevel;
+    return Object.values(networkState.gameState.environments?.[currentEnvId]?.pieces || {}).filter(
+      p => p.class !== 'personagem' &&
+           (Math.round((p.y || 0) / 2.0) + 1 === currentFloor)
+    ).length;
   });
 
   const selectedPiece = $derived.by(() => {
