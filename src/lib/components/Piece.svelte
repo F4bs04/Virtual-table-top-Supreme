@@ -59,9 +59,9 @@
   const isAnimated = $derived(
     textureUrl && (
       textureUrl.toLowerCase().endsWith('.gif') || 
-      textureUrl.toLowerCase().endsWith('.webp') || 
       textureUrl.startsWith('data:image/gif') || 
-      textureUrl.startsWith('data:image/webp')
+      textureUrl.startsWith('data:image/webp') ||
+      customPartConfig !== undefined
     )
   );
   const customPartConfig = $derived(
