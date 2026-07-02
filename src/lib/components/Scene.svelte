@@ -147,15 +147,28 @@
     return pts;
   });
 
-  // Basic plane size derivations
-  const basicPlaneSizeSetting = $derived(networkState.gameState.basicPlaneSize || 'medium');
-  const basicPlaneMultiplier = $derived.by(() => {
-    if (basicPlaneSizeSetting === 'small') return 1.5;
-    if (basicPlaneSizeSetting === 'large') return 6.0;
-    return 3.0; // medium
+  let mapWidth = $state(24);
+  let mapDepth = $state(24);
+
+  $effect(() => {
+    if (backgroundTexture && backgroundTexture.image) {
+      const img = backgroundTexture.image;
+      if (img.width && img.height) {
+        const aspect = img.width / img.height;
+        mapWidth = gridSize;
+        mapDepth = gridSize / aspect;
+      } else {
+        mapWidth = gridSize;
+        mapDepth = zMax;
+      }
+    } else {
+      mapWidth = gridSize;
+      mapDepth = zMax;
+    }
   });
-  const basicPlaneWidth = $derived(gridSize * basicPlaneMultiplier);
-  const basicPlaneDepth = $derived(zMax * basicPlaneMultiplier);
+
+  const basicPlaneWidth = $derived(mapWidth);
+  const basicPlaneDepth = $derived(mapDepth);
 
   const basicPlaneColor = $derived.by(() => {
     const theme = envConfig.theme || 'soul-society';
@@ -1320,9 +1333,9 @@
 
 <!-- Custom Background Map Image -->
 {#if backgroundTexture}
-  {#key gridSize}
+  {#key gridSize + '-' + mapWidth + '-' + mapDepth}
     <T.Mesh position={[gridSize / 2, -0.012, zMax / 2]} rotation={[-Math.PI / 2, 0, 0]} frustumCulled={false}>
-      <T.PlaneGeometry args={[gridSize, zMax]} />
+      <T.PlaneGeometry args={[mapWidth, mapDepth]} />
       <T.MeshBasicMaterial 
         map={backgroundTexture} 
         side={THREE.DoubleSide} 

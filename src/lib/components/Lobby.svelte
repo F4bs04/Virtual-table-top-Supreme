@@ -638,20 +638,8 @@
                   <option value={32}>32 x 32 (Large)</option>
                   <option value={48}>48 x 48 (Gotei Scale)</option>
                   <option value={64}>64 x 64 (Raid Scale)</option>
-                </select>
-              </div>
-
-              <!-- Basic Plane Size Selector -->
-              <div class="control-row">
-                <span class="control-label">Plano Básico:</span>
-                <select 
-                  value={networkState.gameState.basicPlaneSize || 'medium'} 
-                  onchange={(e) => networkState.updateBasicPlaneSize(e.target.value)} 
-                  class="vtt-select"
-                >
-                  <option value="small">Pequeno (Small)</option>
-                  <option value="medium">Médio (Medium)</option>
-                  <option value="large">Grande (Large)</option>
+                  <option value={96}>96 x 96 (Colossal)</option>
+                  <option value={128}>128 x 128 (Colossal)</option>
                 </select>
               </div>
 
