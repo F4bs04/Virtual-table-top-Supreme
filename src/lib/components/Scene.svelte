@@ -47,7 +47,7 @@
           if (isBuildMode) return true;
           // Game Mode: strict floor filter — only show objects on the current floor.
           const py = p.y ?? 0;
-          return Math.abs(py - currentViewY) < 0.1;
+          return py <= currentViewY + 0.1;
         }
         return true;
       }

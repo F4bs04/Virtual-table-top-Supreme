@@ -129,20 +129,10 @@
   });
 
   let dragStartPos = null;
-  let distanceScale = $state(1.0);
 
   useTask((delta) => {
     if (meshRef && camera.current) {
       meshRef.quaternion.copy(camera.current.quaternion);
-    }
-    if (camera.current) {
-      const camPos = camera.current.position;
-      const dx = camPos.x - currentX;
-      const dy = camPos.y - currentY;
-      const dz = camPos.z - currentZ;
-      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-      const referenceDistance = 15;
-      distanceScale = referenceDistance / Math.max(5, dist);
     }
 
     if (networkState.gameState.gameModeActive) {
@@ -476,7 +466,7 @@
             width: 100px;
             height: 100px;
             object-fit: contain;
-            transform: scale(${(isHovered ? 1.4 : 1.2) * scale * distanceScale * (flipX ? -1 : 1)}, ${(isHovered ? 1.4 : 1.2) * scale * distanceScale}) translateY(${-visualY * 100}px);
+            transform: scale(${(isHovered ? 1.4 : 1.2) * scale * (flipX ? -1 : 1)}, ${(isHovered ? 1.4 : 1.2) * scale}) translateY(${-visualY * 100}px);
             opacity: ${opacityMultiplier * (dashBlink ? 0.25 : 1.0)};
             filter: drop-shadow(0 0 8px ${color});
             cursor: pointer;
