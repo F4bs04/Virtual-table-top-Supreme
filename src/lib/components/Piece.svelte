@@ -80,7 +80,19 @@
 
   let canvasEl = $state(null);
   let imgEl = $state(null);
-  let canvasTextureRef = $state(null);
+  let animatedTexture = $state(null);
+
+  $effect(() => {
+    if (isAnimated && canvasEl) {
+      const tex = new THREE.CanvasTexture(canvasEl);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      animatedTexture = tex;
+      return () => {
+        tex.dispose();
+        animatedTexture = null;
+      };
+    }
+  });
 
   const { camera } = useThrelte();
 
@@ -135,14 +147,12 @@
   let dragStartPos = null;
 
   useTask((delta) => {
-    if (isAnimated && imgEl && canvasEl) {
+    if (isAnimated && imgEl && canvasEl && animatedTexture) {
       const ctx = canvasEl.getContext('2d');
       if (ctx) {
         ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
         ctx.drawImage(imgEl, 0, 0, canvasEl.width, canvasEl.height);
-        if (canvasTextureRef) {
-          canvasTextureRef.needsUpdate = true;
-        }
+        animatedTexture.needsUpdate = true;
       }
     }
 
@@ -468,7 +478,7 @@
         bind:this={imgEl}
         src={textureUrl}
         alt="hidden asset"
-        style="display: none;"
+        style="position: absolute; left: -9999px; top: -9999px; width: 1px; height: 1px; opacity: 0;"
       />
     {/key}
     <canvas 
@@ -493,17 +503,13 @@
       >
         <T.PlaneGeometry args={[1, 1]} />
         <T.MeshBasicMaterial 
+          map={animatedTexture}
           color={overlayColor}
           transparent={true}
           alphaTest={currentAlphaTest}
           opacity={opacityMultiplier * (dashBlink ? 0.25 : 1.0)}
           side={THREE.DoubleSide}
-        >
-          <T.CanvasTexture 
-            bind:ref={canvasTextureRef}
-            args={[canvasEl]} 
-          />
-        </T.MeshBasicMaterial>
+        />
       </T.Mesh>
     {/if}
 
