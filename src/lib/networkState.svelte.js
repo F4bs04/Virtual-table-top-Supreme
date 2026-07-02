@@ -284,6 +284,7 @@ export const networkState = $state({
     currentTurnIndex: 0,
     turnPhase: 'idle', // 'idle' | 'active'
     activeParticles: [], // List of active particle burst events
+    customParticles: [], // List of custom registered particle effects (name + url)
     currentEnvironmentId: 'env-1',
     environments: {
       'env-1': {
@@ -620,15 +621,49 @@ export const networkState = $state({
       networkState.addLog(`${roll.name} rolled ${roll.die}: [ ${roll.result} ]`);
       // Delta: only the new roll entry
       networkState.broadcastDelta('ROLL_ADDED', { roll });
-    } else if (data.type === 'INTENT_PIECE_EFFECT') {
-      const { pieceId, effectType } = data;
-      const piece = networkState.gameState.pieces[pieceId];
-      if (piece) {
-        const effect = { type: effectType, timestamp: Date.now() };
-        piece.animationEffect = effect;
-        networkState.addLog(`Client ${conn.peer} triggered visual effect '${effectType}' on ${piece.name}`);
-        // Delta: only the effect payload
-        networkState.broadcastDelta('PIECE_EFFECT', { pieceId, animationEffect: effect });
+    } else if (data.type === 'INTENT_PARTICLES') {
+      const { x, z, effectType } = data;
+      const burst = {
+        id: `burst-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        x,
+        z,
+        effectType,
+        timestamp: Date.now()
+      };
+      if (!networkState.gameState.activeParticles) {
+        networkState.gameState.activeParticles = [];
+      }
+      networkState.gameState.activeParticles = [burst, ...networkState.gameState.activeParticles.slice(0, 4)];
+      networkState.addLog(`Player triggered a particle effect at (${x}, ${z})!`);
+      networkState.broadcastDelta('PARTICLES_DELTA', { activeParticles: networkState.gameState.activeParticles });
+    } else if (data.type === 'INTENT_REGISTER_PARTICLE') {
+      const { name, url } = data;
+      if (!networkState.gameState.customParticles) {
+        networkState.gameState.customParticles = [];
+      }
+      const newParticle = {
+        id: `custom-part-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        name,
+        url,
+        duration: 1500,
+        opacity: 1.0,
+        behavior: 'animated' // 'animated' (grow & fade) or 'static' (static large)
+      };
+      networkState.gameState.customParticles.push(newParticle);
+      networkState.addLog(`Client registered custom particle: ${name}`);
+      networkState.broadcastGameState(true);
+    } else if (data.type === 'INTENT_UPDATE_PARTICLE') {
+      const { particleId, updates } = data;
+      if (networkState.gameState.customParticles) {
+        const part = networkState.gameState.customParticles.find(p => p.id === particleId);
+        if (part) {
+          if (updates.name !== undefined) part.name = updates.name;
+          if (updates.duration !== undefined) part.duration = Number(updates.duration) || 1500;
+          if (updates.opacity !== undefined) part.opacity = Number(updates.opacity) ?? 1.0;
+          if (updates.behavior !== undefined) part.behavior = updates.behavior;
+          networkState.addLog(`Client updated custom particle: ${part.name}`);
+          networkState.broadcastGameState(true);
+        }
       }
     }
   },
@@ -2148,8 +2183,9 @@ export const networkState = $state({
       return;
     }
 
+    const currentEnvId = networkState.gameState.currentEnvironmentId || 'env-1';
     const characters = Object.values(networkState.gameState.pieces)
-      .filter(p => p.class === 'personagem');
+      .filter(p => p.class === 'personagem' && (p.environmentId === currentEnvId || (!p.environmentId && currentEnvId === 'env-1')));
 
     if (characters.length === 0) {
       networkState.addLog('No characters found to roll initiative.');
@@ -2252,22 +2288,98 @@ export const networkState = $state({
     networkState.broadcastDelta('TURN_DELTA', { turnOrder: [], currentTurnIndex: 0, turnPhase: 'idle' });
   },
 
-  // Trigger a GM spiritual burst/particles
+  // Trigger a spiritual burst/particles (available to all players)
   triggerParticles(x, z, effectType = 'burst') {
+    if (networkState.role === 'host') {
+      const burst = {
+        id: `burst-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        x,
+        z,
+        effectType,
+        timestamp: Date.now()
+      };
+      if (!networkState.gameState.activeParticles) {
+        networkState.gameState.activeParticles = [];
+      }
+      networkState.gameState.activeParticles = [burst, ...networkState.gameState.activeParticles.slice(0, 4)];
+      networkState.addLog(`Triggered a ${effectType.startsWith('data:') || effectType.startsWith('http') ? 'custom' : effectType} particle effect at (${x}, ${z})!`);
+      networkState.broadcastDelta('PARTICLES_DELTA', { activeParticles: networkState.gameState.activeParticles });
+    } else if (networkState.role === 'client') {
+      networkState.addLog(`Requesting particle effect at (${x}, ${z})...`);
+      if (networkState.hostConnection && networkState.hostConnection.open) {
+        networkState.hostConnection.send({
+          type: 'INTENT_PARTICLES',
+          x,
+          z,
+          effectType
+        });
+      }
+    }
+  },
+
+  registerCustomParticle(name, urlOrDataUrl) {
+    if (!name || !urlOrDataUrl) return;
+    if (networkState.role === 'host') {
+      if (!networkState.gameState.customParticles) {
+        networkState.gameState.customParticles = [];
+      }
+      const newParticle = {
+        id: `custom-part-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        name,
+        url: urlOrDataUrl,
+        duration: 1500,
+        opacity: 1.0,
+        behavior: 'animated'
+      };
+      networkState.gameState.customParticles.push(newParticle);
+      networkState.addLog(`Registered custom particle: ${name}`);
+      networkState.broadcastGameState(true);
+    } else if (networkState.role === 'client') {
+      networkState.addLog(`Requesting to register custom particle: ${name}...`);
+      if (networkState.hostConnection && networkState.hostConnection.open) {
+        networkState.hostConnection.send({
+          type: 'INTENT_REGISTER_PARTICLE',
+          name,
+          url: urlOrDataUrl
+        });
+      }
+    }
+  },
+
+  updateCustomParticle(particleId, updates) {
+    if (networkState.role === 'host') {
+      if (networkState.gameState.customParticles) {
+        const part = networkState.gameState.customParticles.find(p => p.id === particleId);
+        if (part) {
+          if (updates.name !== undefined) part.name = updates.name;
+          if (updates.duration !== undefined) part.duration = Number(updates.duration) || 1500;
+          if (updates.opacity !== undefined) part.opacity = Number(updates.opacity) ?? 1.0;
+          if (updates.behavior !== undefined) part.behavior = updates.behavior;
+          networkState.addLog(`Updated custom particle: ${part.name}`);
+          networkState.broadcastGameState(true);
+        }
+      }
+    } else if (networkState.role === 'client') {
+      if (networkState.hostConnection && networkState.hostConnection.open) {
+        networkState.hostConnection.send({
+          type: 'INTENT_UPDATE_PARTICLE',
+          particleId,
+          updates
+        });
+      }
+    }
+  },
+
+  deleteCustomParticle(particleId) {
     if (networkState.role !== 'host') {
-      networkState.addLog('BLOCKED: Only the Host can trigger particles.');
+      networkState.addLog('BLOCKED: Only the Host can delete custom particles.');
       return;
     }
-    const burst = {
-      id: `burst-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      x,
-      z,
-      effectType,
-      timestamp: Date.now()
-    };
-    networkState.gameState.activeParticles = [burst, ...networkState.gameState.activeParticles.slice(0, 4)];
-    networkState.addLog(`GM triggered a ${effectType} particle effect at (${x}, ${z})!`);
-    networkState.broadcastDelta('PARTICLES_DELTA', { activeParticles: networkState.gameState.activeParticles });
+    if (networkState.gameState.customParticles) {
+      networkState.gameState.customParticles = networkState.gameState.customParticles.filter(p => p.id !== particleId);
+      networkState.addLog(`Deleted custom particle.`);
+      networkState.broadcastGameState(true);
+    }
   },
 
   // Trigger a damage or heal overlay + bounce effect on a piece

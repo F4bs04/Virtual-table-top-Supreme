@@ -208,7 +208,19 @@
     const file = event.target.files[0];
     if (file) {
       try {
-        const dataUrl = await compressImage(file, 1024, 1024, 0.7);
+        let dataUrl;
+        const isAnimType = file.type === 'image/gif' || file.type === 'image/webp' || file.name.toLowerCase().endsWith('.gif') || file.name.toLowerCase().endsWith('.webp');
+        if (isAnimType) {
+          // Read directly to preserve animation frames
+          dataUrl = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = (err) => reject(err);
+            reader.readAsDataURL(file);
+          });
+        } else {
+          dataUrl = await compressImage(file, 1024, 1024, 0.7);
+        }
         if (dataUrl) networkState.updatePieceTexture(pieceId, dataUrl);
       } catch (err) {
         console.error('Erro ao carregar imagem do token:', err);
@@ -781,10 +793,165 @@
                     {networkState.gameState.buildMode ? 'ACTIVE (Customizing)' : 'LOCKED'}
                   </strong>
                 </div>
-              </div>
             </div>
+          </div>
           {/if}
 
+          <!-- ── Custom Particles Registration (Visible to Host and Client) ── -->
+          <div class="glass-card fade-in" style="margin-top: 1rem; padding: 1rem; border: 1px solid rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.02); border-radius: 8px;">
+            <h4 style="margin: 0 0 0.75rem 0; color: #06b6d4; font-size: 0.9rem; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.35rem;">
+              ✨ Partículas Customizadas (GIF/WebP)
+            </h4>
+            
+            <!-- Registration Form -->
+            <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem;">
+              <div style="display: flex; gap: 0.5rem;">
+                <input 
+                  type="text" 
+                  placeholder="Nome do Efeito (ex: Getsuga)" 
+                  id="new-particle-name"
+                  class="vtt-input mini-input"
+                  style="font-size: 0.75rem; flex: 1; padding: 0.35rem 0.55rem; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff;"
+                />
+                <label 
+                  class="file-upload-btn" 
+                  style="margin: 0; padding: 0.4rem 0.75rem; font-size: 0.78rem; cursor: pointer; display: flex; align-items: center; justify-content: center; background: rgba(168, 85, 247, 0.2); border: 1px solid #a855f7; border-radius: 6px; color: #fff; font-weight: bold;"
+                >
+                  Upar GIF/WebP
+                  <input 
+                    type="file" 
+                    accept="image/gif,image/webp" 
+                    style="display: none;"
+                    onchange={async (e) => {
+                      const file = e.target.files[0];
+                      if (file) {
+                        const nameInput = document.getElementById('new-particle-name');
+                        const name = nameInput?.value?.trim() || file.name.replace(/\.[^/.]+$/, '');
+                        
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                          networkState.registerCustomParticle(name, event.target.result);
+                          if (nameInput) nameInput.value = '';
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+              </div>
+              
+              <div style="display: flex; gap: 0.5rem;">
+                <input 
+                  type="text" 
+                  placeholder="Ou cole a URL do GIF/WebP" 
+                  id="new-particle-url"
+                  class="vtt-input mini-input"
+                  style="font-size: 0.75rem; flex: 1; padding: 0.35rem 0.55rem; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff;"
+                />
+                <button 
+                  onclick={() => {
+                    const nameInput = document.getElementById('new-particle-name');
+                    const urlInput = document.getElementById('new-particle-url');
+                    const name = nameInput?.value?.trim();
+                    const url = urlInput?.value?.trim();
+                    if (name && url) {
+                      networkState.registerCustomParticle(name, url);
+                      if (nameInput) nameInput.value = '';
+                      if (urlInput) urlInput.value = '';
+                    } else {
+                      networkState.addLog('Insira nome e URL do efeito!');
+                    }
+                  }}
+                  class="vtt-btn btn-primary"
+                  style="padding: 0.4rem 0.75rem; font-size: 0.75rem; font-weight: bold;"
+                >
+                  Adicionar URL
+                </button>
+              </div>
+            </div>
+
+            <!-- List of Registered Custom Particles -->
+            <div class="custom-particles-list" style="display: flex; flex-direction: column; gap: 0.35rem; max-height: 180px; overflow-y: auto;">
+              {#if (networkState.gameState.customParticles?.length || 0) === 0}
+                <div style="font-size: 0.78rem; color: #64748b; font-style: italic; text-align: center;">Nenhuma partícula customizada cadastrada.</div>
+              {:else}
+                {#each (networkState.gameState.customParticles || []) as part (part.id)}
+                  <div style="display: flex; flex-direction: column; gap: 0.4rem; padding: 0.5rem 0.75rem; background: rgba(0,0,0,0.25); border-radius: 8px; border-left: 3px solid #06b6d4;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;">
+                      <!-- Preview thumbnail -->
+                      <img src={part.url} alt={part.name} style="width: 28px; height: 28px; object-fit: contain; border-radius: 4px; background: rgba(255,255,255,0.05);" />
+                      
+                      <!-- Rename Input -->
+                      <input 
+                        type="text" 
+                        value={part.name} 
+                        onchange={(e) => networkState.updateCustomParticle(part.id, { name: e.target.value })}
+                        style="font-size: 0.75rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 0.25rem 0.45rem; border-radius: 4px; flex: 1; min-width: 80px;"
+                        placeholder="Nome do efeito"
+                      />
+                      
+                      {#if networkState.role === 'host'}
+                        <button 
+                          onclick={() => networkState.deleteCustomParticle(part.id)}
+                          class="delete-piece-btn"
+                          style="margin: 0; padding: 0.2rem 0.45rem; font-size: 0.7rem; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171;"
+                          title="Excluir partícula"
+                        >
+                          ✕
+                        </button>
+                      {/if}
+                    </div>
+
+                    <!-- Behavior Style Selector -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.4rem;">
+                      <span style="font-size: 0.65rem; color: #94a3b8; white-space: nowrap;">Comportamento:</span>
+                      <select 
+                        value={part.behavior || 'animated'} 
+                        onchange={(e) => networkState.updateCustomParticle(part.id, { behavior: e.target.value })}
+                        style="background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.15); color: #fff; padding: 0.15rem 0.35rem; border-radius: 4px; font-size: 0.7rem; cursor: pointer; outline: none; flex: 1; max-width: 170px;"
+                      >
+                        <option value="animated">Crescer e Sumir (Animado)</option>
+                        <option value="static">Estático e Maior</option>
+                      </select>
+                    </div>
+                    
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.4rem;">
+                      <!-- Duration Input -->
+                      <div style="display: flex; align-items: center; gap: 0.25rem;">
+                        <span style="font-size: 0.65rem; color: #94a3b8;">Duração:</span>
+                        <input 
+                          type="number" 
+                          value={part.duration || 1500} 
+                          onchange={(e) => networkState.updateCustomParticle(part.id, { duration: Number(e.target.value) || 1500 })}
+                          style="font-size: 0.7rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 0.15rem 0.35rem; border-radius: 4px; width: 55px; text-align: center;"
+                          min="100"
+                          max="10000"
+                          step="100"
+                        />
+                        <span style="font-size: 0.65rem; color: #94a3b8;">ms</span>
+                      </div>
+
+                      <!-- Opacity Slider -->
+                      <div style="display: flex; align-items: center; gap: 0.25rem;">
+                        <span style="font-size: 0.65rem; color: #94a3b8;">Opacidade:</span>
+                        <input 
+                          type="range" 
+                          min="0.1" 
+                          max="1.0" 
+                          step="0.05"
+                          value={part.opacity ?? 1.0} 
+                          onchange={(e) => networkState.updateCustomParticle(part.id, { opacity: Number(e.target.value) })}
+                          style="cursor: pointer; width: 60px; accent-color: #06b6d4; height: 4px;"
+                        />
+                        <span style="font-size: 0.65rem; font-family: monospace; color: #06b6d4; min-width: 25px; text-align: right;">{Math.round((part.opacity ?? 1.0) * 100)}%</span>
+                      </div>
+                    </div>
+                  </div>
+                {/each}
+              {/if}
+            </div>
+          </div>
 
         {:else if activeTab === 'tokens'}
           <!-- TOKENS TAB -->
@@ -998,7 +1165,7 @@
                           {@const isPieceVisible = piece.visibleOnMap !== false}
                           <div
                             class="piece-uploader-row {networkState.selectedPieceId === piece.id ? 'selected-row' : ''}"
-                            style="padding: 0.35rem 0.5rem; display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.2); border-radius: 6px; cursor: pointer; border: 1px solid {networkState.selectedPieceId === piece.id ? piece.color : 'transparent'}; transition: background 0.15s;"
+                            style="padding: 0.5rem; display: flex; flex-direction: column; gap: 0.35rem; background: rgba(0,0,0,0.2); border-radius: 8px; cursor: pointer; border: 1px solid {networkState.selectedPieceId === piece.id ? piece.color : 'transparent'}; transition: background 0.15s;"
                             onclick={() => selectPiece(piece)}
                             draggable={networkState.role === 'host'}
                             ondragstart={(e) => {
@@ -1010,16 +1177,19 @@
                             role="button"
                             tabindex="0"
                           >
-                            <div style="display: flex; align-items: center; gap: 0.4rem; flex: 1; min-width: 0;">
+                            <!-- Row 1: Dot, Name, HP -->
+                            <div style="display: flex; align-items: center; gap: 0.4rem; width: 100%;">
                               <div style="width: 8px; height: 8px; border-radius: 50%; background: {piece.color}; flex-shrink: 0;"></div>
-                              <span class="piece-name" style="font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; opacity: {isPieceVisible ? 1.0 : 0.45};">
+                              <span class="piece-name" style="font-size: 0.82rem; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; opacity: {isPieceVisible ? 1.0 : 0.45};">
                                 {piece.name}
                               </span>
                               {#if piece.class === 'personagem' && piece.maxHp}
-                                <span style="font-size: 0.65rem; font-family: monospace; color: #64748b; flex-shrink: 0;">{piece.hp ?? 0}/{piece.maxHp}</span>
+                                <span style="font-size: 0.72rem; font-family: monospace; color: #a855f7; font-weight: 700; flex-shrink: 0; background: rgba(168,85,247,0.1); padding: 0.05rem 0.35rem; border-radius: 4px;">{piece.hp ?? 0}/{piece.maxHp} HP</span>
                               {/if}
                             </div>
-                            <div class="piece-actions" style="display: flex; gap: 0.25rem; flex-shrink: 0; margin-left: 0.4rem;" onclick={(e) => e.stopPropagation()}>
+
+                            <!-- Row 2: Actions -->
+                            <div class="piece-actions" style="display: flex; align-items: center; justify-content: flex-start; gap: 0.35rem; flex-wrap: wrap; width: 100%; border-top: 1px solid rgba(255,255,255,0.04); padding-top: 0.35rem;" onclick={(e) => e.stopPropagation()}>
                               <!-- Individual visibility eye toggle -->
                               <button
                                 type="button"
@@ -1032,9 +1202,9 @@
                                     networkState.addLog('BLOCKED: Apenas o Mestre pode alterar a visibilidade.');
                                   }
                                 }}
-                                style="margin: 0; padding: 0.15rem 0.35rem; font-size: 0.65rem; background: {isPieceVisible ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)'}; border-color: {isPieceVisible ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}; color: {isPieceVisible ? '#4ade80' : '#f87171'};"
+                                style="margin: 0; padding: 0.2rem 0.4rem; font-size: 0.7rem; background: {isPieceVisible ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)'}; border-color: {isPieceVisible ? 'rgba(34,197,94,0.35)' : 'rgba(239,68,68,0.35)'}; color: {isPieceVisible ? '#4ade80' : '#f87171'};"
                               >
-                                {isPieceVisible ? "👁️" : "👁️‍🗨️"}
+                                {isPieceVisible ? "👁️ Visível" : "👁️‍🗨️ Oculto"}
                               </button>
 
                               {#if networkState.role === 'host'}
@@ -1043,18 +1213,18 @@
                                   class="file-upload-btn"
                                   title="Duplicar e mover copia"
                                   onclick={() => networkState.duplicatePiece(piece.id)}
-                                  style="margin: 0; padding: 0.15rem 0.35rem; font-size: 0.65rem; line-height: 1.2; cursor: pointer;"
+                                  style="margin: 0; padding: 0.2rem 0.4rem; font-size: 0.7rem; cursor: pointer;"
                                 >
-                                  Dup
+                                  Duplicar
                                 </button>
                                 {#if piece.class === 'personagem'}
-                                  <span style="display: inline-flex; align-items: center; gap: 0.2rem; color: #94a3b8; font-size: 0.65rem;">
+                                  <span style="display: inline-flex; align-items: center; gap: 0.2rem; color: #94a3b8; font-size: 0.7rem;">
                                     ➜
                                     <select
                                       title="Enviar personagem para cenário"
                                       value={piece.environmentId || 'env-1'}
                                       onchange={(e) => networkState.moveCharacterToEnvironment(piece.id, e.target.value)}
-                                      style="max-width: 92px; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(168, 85, 247, 0.45); color: #e9d5ff; border-radius: 4px; padding: 0.12rem 0.25rem; font-size: 0.65rem; outline: none;"
+                                      style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(168, 85, 247, 0.45); color: #e9d5ff; border-radius: 4px; padding: 0.15rem 0.3rem; font-size: 0.7rem; outline: none; cursor: pointer;"
                                     >
                                       {#each Object.values(networkState.gameState.environments || {}) as env}
                                         <option value={env.id}>{env.name}</option>
@@ -1069,9 +1239,9 @@
                                   onclick={() => {
                                     document.getElementById(`texture-upload-${piece.id}`)?.click();
                                   }}
-                                  style="margin: 0; padding: 0.15rem 0.35rem; font-size: 0.65rem; line-height: 1.2; cursor: pointer;"
+                                  style="margin: 0; padding: 0.2rem 0.4rem; font-size: 0.7rem; cursor: pointer;"
                                 >
-                                  Img
+                                  Imagem
                                 </button>
                                 <input
                                   id={`texture-upload-${piece.id}`}
@@ -1085,18 +1255,18 @@
                                     onclick={() => networkState.updatePieceTexture(piece.id, '')}
                                     class="delete-piece-btn"
                                     title="Remover imagem"
-                                    style="padding: 0.15rem 0.35rem; font-size: 0.65rem;"
+                                    style="width: auto; height: auto; padding: 0.2rem 0.55rem; font-size: 0.7rem; margin: 0;"
                                   >
-                                    Img ✕
+                                    Limpar Img
                                   </button>
                                 {/if}
                                 <button 
                                   onclick={() => networkState.deletePiece(piece.id)} 
                                   class="delete-piece-btn"
                                   title="Excluir Token"
-                                  style="padding: 0.15rem 0.35rem; font-size: 0.65rem;"
+                                  style="width: auto; height: auto; padding: 0.2rem 0.55rem; font-size: 0.7rem; margin: 0; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171;"
                                 >
-                                  ✕
+                                  Excluir
                                 </button>
                               {/if}
                             </div>

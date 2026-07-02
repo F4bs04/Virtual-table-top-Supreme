@@ -13,6 +13,7 @@
   import Window from './Window.svelte';
   import Stair from './Stair.svelte';
   import Shape3D from './Shape3D.svelte';
+  import CustomParticleSprite from './CustomParticleSprite.svelte';
   import * as THREE from 'three';
 
   // Only emit debug logs in development builds
@@ -628,11 +629,7 @@
     }
 
     if (networkState.activeTool === 'particles') {
-      if (networkState.role === 'host') {
-        networkState.triggerParticles(targetX, targetZ, networkState.activeParticleType || 'burst');
-      } else {
-        networkState.addLog('BLOCKED: Only the Host (Master) can trigger particle bursts.');
-      }
+      networkState.triggerParticles(targetX, targetZ, networkState.activeParticleType || 'burst');
       return;
     }
 
@@ -858,11 +855,7 @@
           if (networkState.activeTool === 'particles') {
             const targetHex = getPointerHex(e);
             if (targetHex) {
-              if (networkState.role === 'host') {
-                networkState.triggerParticles(targetHex.c, targetHex.r, networkState.activeParticleType || 'burst');
-              } else {
-                networkState.addLog('BLOCKED: Only the Host (Master) can trigger particle bursts.');
-              }
+              networkState.triggerParticles(targetHex.c, targetHex.r, networkState.activeParticleType || 'burst');
             }
             return;
           }
@@ -1061,7 +1054,6 @@
 {/key}
 
 <!-- GM Spiritual Burst Particle Effects -->
-{#if !networkState.gameState.gameModeActive}
 {#each (networkState.gameState.activeParticles || []) as burst (burst.id)}
   {@const effectType = burst.effectType || 'burst'}
   {@const age = frameTime - burst.timestamp}
@@ -1169,9 +1161,26 @@
         <T.MeshBasicMaterial color={gridColor} transparent opacity={opacityVal * 0.6} side={THREE.DoubleSide} />
       </T.Mesh>
     {/if}
+  {:else}
+    {@const config = (networkState.gameState.customParticles || []).find(p => p.url === effectType) || { duration: 1500, opacity: 1.0, behavior: 'animated' }}
+    {@const duration = config.duration || 1500}
+    {#if age < duration}
+      {@const progress = age / duration}
+      {@const opacityVal = (1.0 - progress) * (config.opacity ?? 1.0)}
+      {@const isStatic = config.behavior === 'static'}
+      {@const scaleVal = isStatic ? 1.8 : (0.4 + progress * 1.6)}
+      {@const floatY = isStatic ? 0 : (progress * 1.2)}
+      {@const burstWorld = hexToWorld(burst.x, burst.z)}
+      <CustomParticleSprite 
+        url={effectType} 
+        position={[burstWorld.x, effectY + 0.5, burstWorld.z]} 
+        floatY={floatY}
+        scale={scaleVal} 
+        opacity={opacityVal} 
+      />
+    {/if}
   {/if}
 {/each}
-{/if}
 
 <!-- Hover Highlight: subtle thin glow ring only, no fill -->
 {#if hoveredHex}

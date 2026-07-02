@@ -86,7 +86,7 @@
 
   $effect(() => {
     if (networkState.role === 'client') {
-      const allowedTools = ['hand', 'select', 'move'];
+      const allowedTools = ['hand', 'select', 'move', 'particles'];
       if (!allowedTools.includes(networkState.activeTool)) {
         networkState.activeTool = 'hand';
         networkState.drawingMode = false;
@@ -160,6 +160,9 @@
                 <option value="bubbles">Esferas Ascendentes (Bolinhas)</option>
                 <option value="lightning">Raios Espirituais (Raios)</option>
                 <option value="light">Explosão de Luz (Luz)</option>
+                {#each (networkState.gameState.customParticles || []) as customPart}
+                  <option value={customPart.url}>{customPart.name}</option>
+                {/each}
               </select>
               <span style="opacity: 0.8; font-size: 0.75rem;">// CLIQUE NA GRADE PARA DETONAR</span>
             </div>
@@ -233,11 +236,10 @@
         <span class="tool-label">Select</span>
       </button>
 
-      {#if networkState.role === 'host'}
-        <button 
-          class="tool-btn {networkState.activeTool === 'particles' ? 'active' : ''}" 
-          onclick={() => { 
-            networkState.activeTool = 'particles'; 
+      <button 
+        class="tool-btn {networkState.activeTool === 'particles' ? 'active' : ''}" 
+        onclick={() => { 
+          networkState.activeTool = 'particles'; 
           networkState.drawingMode = false; 
           networkState.drawingStartHex = null;
           networkState.addLog('Particles Tool active: Click grid cells to trigger a spiritual wave!');
@@ -248,6 +250,7 @@
         <span class="tool-label">Particles</span>
       </button>
 
+      {#if networkState.role === 'host'}
       <div class="toolbar-divider"></div>
 
       <button 
@@ -336,9 +339,11 @@
   {/if}
 
   <!-- Threlte 3D Canvas -->
-  <Canvas>
-    <Scene />
-  </Canvas>
+  <div style="position: relative; width: 100%; height: 100%; display: flex; flex: 1; min-height: 0; min-width: 0;">
+    <Canvas>
+      <Scene />
+    </Canvas>
+  </div>
 
   <!-- Fullscreen Shared Image Overlay -->
   {#if networkState.gameState.activePopupImage}

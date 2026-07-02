@@ -2,6 +2,7 @@
   import { T, useTask, useThrelte } from '@threlte/core';
   import { networkState } from '../networkState.svelte.js';
   import { loadSharedTexture } from '../textureCache.js';
+  import { HTML } from '@threlte/extras';
   import * as THREE from 'three';
 
   // Svelte 5 Props
@@ -55,6 +56,27 @@
   const isDead = $derived(pieceData?.dead ?? false);
   const isStunned = $derived(pieceData?.stunned ?? false);
   const flipX = $derived(pieceData?.flipX ?? false);
+  const isAnimated = $derived(
+    textureUrl && (
+      textureUrl.toLowerCase().endsWith('.gif') || 
+      textureUrl.toLowerCase().endsWith('.webp') || 
+      textureUrl.startsWith('data:image/gif') || 
+      textureUrl.startsWith('data:image/webp')
+    )
+  );
+  const customPartConfig = $derived(
+    (networkState.gameState.customParticles || []).find(p => p.url === textureUrl)
+  );
+  const loopDuration = $derived(customPartConfig?.duration || 2000);
+  
+  let loopBuster = $state(0);
+  $effect(() => {
+    if (!isAnimated || !textureUrl) return;
+    const interval = setInterval(() => {
+      loopBuster += 1;
+    }, loopDuration);
+    return () => clearInterval(interval);
+  });
 
   const { camera } = useThrelte();
 
@@ -107,10 +129,20 @@
   });
 
   let dragStartPos = null;
+  let distanceScale = $state(1.0);
 
   useTask((delta) => {
     if (meshRef && camera.current) {
       meshRef.quaternion.copy(camera.current.quaternion);
+    }
+    if (camera.current) {
+      const camPos = camera.current.position;
+      const dx = camPos.x - currentX;
+      const dy = camPos.y - currentY;
+      const dz = camPos.z - currentZ;
+      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      const referenceDistance = 15;
+      distanceScale = referenceDistance / Math.max(5, dist);
     }
 
     if (networkState.gameState.gameModeActive) {
@@ -425,9 +457,39 @@
     </T.Mesh>
   {/if}
 
+  {#if isAnimated}
+    <HTML 
+      sprite
+      position={[0, 0.6 * scale, 0]}
+      pointerEvents="auto"
+      center
+    >
+      {#key loopBuster}
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+        <img 
+          src={textureUrl} 
+          alt={name}
+          onpointerdown={handlePointerDown}
+          onpointerover={() => { isHovered = true; }}
+          onpointerout={() => { isHovered = false; }}
+          style="
+            width: 100px;
+            height: 100px;
+            object-fit: contain;
+            transform: scale(${(isHovered ? 1.4 : 1.2) * scale * distanceScale * (flipX ? -1 : 1)}, ${(isHovered ? 1.4 : 1.2) * scale * distanceScale}) translateY(${-visualY * 100}px);
+            opacity: ${opacityMultiplier * (dashBlink ? 0.25 : 1.0)};
+            filter: drop-shadow(0 0 8px ${color});
+            cursor: pointer;
+            pointer-events: auto;
+          "
+        />
+      {/key}
+    </HTML>
+  {/if}
+
   <!-- Interactive Billboard Group -->
   <T.Group bind:ref={meshRef}>
-    {#if activeTexture}
+    {#if !isAnimated && activeTexture}
       <!-- Main Mesh -->
       <T.Mesh 
         scale={[(isHovered ? 1.4 : 1.2) * scale, (isHovered ? 1.4 : 1.2) * scale, 1]}
