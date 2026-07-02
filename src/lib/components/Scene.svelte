@@ -798,11 +798,13 @@
 
               const structureHit = intersects.find(hit => candidates.some(c => c.mesh === hit.object));
 
+              const isGameMode = networkState.gameState.gameModeActive;
+
               if (characterHit) {
                 found = candidates.find(c => c.mesh === characterHit.object);
               } else if (tokenObjectHit) {
                 found = candidates.find(c => c.mesh === tokenObjectHit.object);
-              } else if (structureHit) {
+              } else if (structureHit && !isGameMode) {
                 found = candidates.find(c => c.mesh === structureHit.object);
               }
 
@@ -967,11 +969,13 @@
 
               const structureHit = intersects.find(hit => candidates.some(c => c.mesh === hit.object));
 
+              const isGameMode = networkState.gameState.gameModeActive;
+
               if (characterHit) {
                 foundPiece = candidates.find(c => c.mesh === characterHit.object);
               } else if (tokenObjectHit) {
                 foundPiece = candidates.find(c => c.mesh === tokenObjectHit.object);
-              } else if (structureHit) {
+              } else if (structureHit && !isGameMode) {
                 foundPiece = candidates.find(c => c.mesh === structureHit.object);
               }
 
