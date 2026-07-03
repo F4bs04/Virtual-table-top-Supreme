@@ -1114,7 +1114,7 @@
 {/key}
 
 <!-- Visual Basic Ground Plane (Plano Básico) -->
-{#key gridSize + '-' + basicPlaneSizeSetting}
+{#key gridSize + '-' + basicPlaneWidth + '-' + basicPlaneDepth}
   <T.Mesh position={[gridSize / 2, -0.02, zMax / 2]} rotation={[-Math.PI / 2, 0, 0]} frustumCulled={false}>
     <T.PlaneGeometry args={[basicPlaneWidth, basicPlaneDepth]} />
     <T.MeshBasicMaterial color={basicPlaneColor} transparent opacity={0.75} side={THREE.DoubleSide} />
@@ -1413,7 +1413,7 @@
 {/if}
 
 <!-- Invisible raycast plane for capturing clicks on the ground -->
-{#key gridSize + '-' + basicPlaneSizeSetting + '-' + networkState.currentViewLevel}
+{#key gridSize + '-' + basicPlaneWidth + '-' + basicPlaneDepth + '-' + networkState.currentViewLevel}
   <T.Mesh 
     rotation={[-Math.PI / 2, 0, 0]} 
     position={[gridSize / 2, (networkState.currentViewLevel - 1) * 2.0 + 0.05, zMax / 2]}
